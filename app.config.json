@@ -39,8 +39,27 @@
           }
         }
       ],
-      "expo-maps",
-      "expo-sqlite"
+      [
+        "expo-maps",
+        {
+          "requestLocationPermission": true,
+          "locationPermission": "Allow SpatiaLynk to use your location"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow SpatiaLynk to use your location always, even when the app is in the background."
+        }
+      ],
+      "expo-sqlite",
+      [
+        "expo-secure-store", 
+        {
+          "configureAndroidBackup": true,
+          "faceIDPermission": "Allow SpatiaLynk to access your Face ID biometric data."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

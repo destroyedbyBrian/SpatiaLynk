@@ -25,6 +25,7 @@
     "expo-location": "~19.0.8",
     "expo-maps": "~0.12.9",
     "expo-router": "~6.0.17",
+    "expo-secure-store": "~15.0.8",
     "expo-splash-screen": "~31.0.12",
     "expo-sqlite": "~16.0.10",
     "expo-status-bar": "~3.0.9",
