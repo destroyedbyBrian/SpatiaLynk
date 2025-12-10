@@ -38,7 +38,9 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-maps",
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,
