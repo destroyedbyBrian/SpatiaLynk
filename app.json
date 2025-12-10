@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "spatiaLynk",
-    "slug": "spatiaLynk",
+    "slug": "spatialynk",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -43,6 +43,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "6b987bc8-b539-4c6d-87b5-21e8cfaefc24"
+      }
+    },
+    "owner": "brianhugo"
   }
 }
