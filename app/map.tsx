@@ -1,9 +1,9 @@
-// LocationGeocodedAddress (reverse geocoding) : lat/long -> human readable address
-// LocationGeocodedLocation (forward geocoding) : address -> lat/long
+// // LocationGeocodedAddress (reverse geocoding) : lat/long -> human readable address
+// // LocationGeocodedLocation (forward geocoding) : address -> lat/long
 
-// onCameraMove
-// onMarkerPress
-// onPOIPress
+// // onCameraMove
+// // onMarkerPress
+// // onPOIPress
 
 import { AppleMaps } from 'expo-maps';
 import { useEffect, useRef, useState } from 'react';
@@ -69,7 +69,7 @@ const Map = () => {
       setCurrentIndex(0);
       zoomToCurrentLevelPOI(0);
     }
-  }, [currentLevel, level0, level1, level2, level3]);
+  }, []);
 
   // Zoom level based on map level
   const getZoomForLevel = (level: MapLevel): number => {
@@ -90,16 +90,16 @@ const Map = () => {
       .filter(poi => {
         // For Level 0, check direct coordinates
         if (currentLevel === 0) {
-          return poi.latitude && poi.longitude;
+          return poi.details.latitude && poi.details.longitude;
         }
         // For higher levels, check if spatial data exists
-        return poi.latitude && poi.longitude;
+        return poi.details.latitude && poi.details.longitude;
       })
       .map((poi) => ({
         id: poi.poi_id,
         coordinates: {
-          latitude: poi.latitude!,
-          longitude: poi.longitude!,
+          latitude: poi.details.latitude!,
+          longitude: poi.details.longitude!,
         },
         title: poi.name,
         subtitle: getSubtitleForLevel(poi, currentLevel),
@@ -215,10 +215,10 @@ const Map = () => {
     if (index < 0 || index >= data.length) return;
 
     const poi = data[index];
-    if (poi.latitude && poi.longitude) {
+    if (poi.details.latitude && poi.details.longitude) {
       moveCameraToCoordinates(
-        poi.latitude,
-        poi.longitude,
+        poi.details.latitude,
+        poi.details.longitude,
         getZoomForLevel(currentLevel)
       );
       setCurrentIndex(index);
@@ -254,11 +254,11 @@ const Map = () => {
     const data = getCurrentLevelData();
     if (data.length === 0) return;
 
-    const validPOIs = data.filter(poi => poi.latitude && poi.longitude);
+    const validPOIs = data.filter(poi => poi.details.latitude && poi.details.longitude);
     if (validPOIs.length === 0) return;
 
-    const latitudes = validPOIs.map(poi => poi.latitude!);
-    const longitudes = validPOIs.map(poi => poi.longitude!);
+    const latitudes = validPOIs.map(poi => poi.details.latitude!);
+    const longitudes = validPOIs.map(poi => poi.details.longitude!);
 
     const minLat = Math.min(...latitudes);
     const maxLat = Math.max(...latitudes);
@@ -336,9 +336,7 @@ const Map = () => {
 
           {/* Bottom Controls */}
           <View style={styles.bottomControls}>
-
             <View />
-      
             {/* Navigation */}
             <View style={styles.navigationButtons}>
               <Pressable
@@ -458,7 +456,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     padding: 12,
     borderRadius: 12,
-    marginHorizontal: 16,
+    margin: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,

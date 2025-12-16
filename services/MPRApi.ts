@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://destroyedbyBrian-spatialynk-recommender-api.hf.space';
+const API_BASE_URL = 'https://destroyedbyBrian-spatialynk.hf.space';
 
 
 export interface Location {
@@ -16,8 +16,6 @@ export interface POIInfo {
   score: number;
   price: string;
   type: string;
-  latitude: number;
-  longitude: number;
   details: {
     category?: string;
     price?: string;
@@ -27,6 +25,8 @@ export interface POIInfo {
     num_venues?: number;
     num_districts?: number;
     textual?: string;
+    latitude?: number;
+    longitude?: number;
   };
 }
 export interface Explanation {
@@ -57,9 +57,9 @@ export interface RecommendationResponse {
 export const checkAPIHealth = async () => {
   try {
     const response = await fetch(`${API_BASE_URL}/health`, {
-      method: 'POST',
+      method: 'GET',
       headers: {
-          'Content-Type': 'application/json'
+        'Content-Type': 'application/json'
       }
     })
     if (!response.ok) {
@@ -67,6 +67,19 @@ export const checkAPIHealth = async () => {
     }
   } catch (err) {
       console.error('API health check failed:', err);
+  }
+}
+
+export const testUser = async () => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/test-user`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+  } catch (err) {
+    console.error('Test User failed:', err)
   }
 }
 
