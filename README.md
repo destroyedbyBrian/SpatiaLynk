@@ -30,7 +30,7 @@ We started by grounding the project in research, referencing a spatial recommend
 Next, we sourced a comprehensive Singapore POI dataset from Kaggle. Rather than using it directly, we spent time understanding the structure and limitations of the data so it could be adapted to fit the system we wanted to build
 (Dataset: https://www.kaggle.com/datasets/sunnysharma432/comprehensive-singapore-poi-dataset).
 
-From there, we generated synthetic user-related datasets, including user preferences and user–POI interaction data. This allowed me to simulate realistic behavior patterns and test how recommendations might change based on different user interests and interaction histories.
+From there, we generated synthetic user-related datasets, including user preferences and user–POI interaction data. This allowed us to simulate realistic behavior patterns and test how recommendations might change based on different user interests and interaction histories.
 
 Once the user data was in place, we cleaned up the POI dataset. This involved standardizing categories, removing noisy or incomplete entries, and ensuring that spatial and semantic attributes were consistent enough to support downstream modeling.
 
@@ -60,7 +60,7 @@ Building SpatiaLynk reinforced the importance of structuring data and models aro
 
 We learned that natural language understanding is critical for bridging user intent and spatial intelligence. Even simple prompts can carry implicit context, and handling missing or ambiguous location signals gracefully is key to delivering relevant results.
 
-Designing a multi-granularity scoring framework highlighted how different signals—distance, interest alignment, hierarchical relevance, and historical interactions—must be carefully balanced rather than optimized in isolation.
+Designing a multi-granularity scoring framework highlighted how different signals: distance, interest alignment, hierarchical relevance, and historical interactions must be carefully balanced rather than optimized in isolation.
 
 Finally, implementing explainability showed that transparent recommendations build trust. Being able to clearly articulate why a POI was suggested helped validate both the system’s decisions and the underlying data pipeline
 
