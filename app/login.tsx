@@ -109,8 +109,8 @@ export default function LoginScreen() {
 
       // Usually auto-login after successful registration
       if (data.session) {
-        // New users are usually free_user by default, go to tabs
-        router.replace("/(tabs)" as any);
+        // New users are usually free_user by default, go to onboarding
+        router.replace("/(user-auth)/onboarding" as any);
       } else {
         // If Supabase email verification is enabled, session might be null
         Alert.alert(
