@@ -79,35 +79,39 @@ export default function LoginScreen() {
 
 	async function handleSignUp() {
 		if (!email || !password || !fullName) {
-		Alert.alert("Notice", "Please fill in all information");
-		return;
+			Alert.alert("Notice", "Please fill in all information");
+			return;
 		}
 		setLoading(true);
 
 		try {
-		const { data, error } = await supabase.auth.signUp({
-			email: email.trim(),
-			password: password,
-			options: { data: { full_name: fullName } }, 
-		});
+			const { data, error } = await supabase.auth.signUp({
+				email: email.trim(),
+				password: password,
+				options: { 
+					data: { 
+						full_name: fullName,
+						role: "free_user"
+					} 
+				}, 
+			});
 
-		if (error) throw error;
+			if (error) throw error;
 
-		// Usually auto-login after successful registration
-		if (data.session) {
-			router.replace("/(tabs)/profile" as any);
-		} else {
-			// If Supabase email verification is enabled, session might be null
-			Alert.alert(
-			"Registration Successful",
-			"Please check your email for the verification link, or log in directly.",
-			);
-			setIsRegistering(false); // Switch back to login state
-		}
+			if (data.session && data.user) {
+				setUser(data.user);
+				router.replace("/(user-auth)/onboarding");
+			} else {
+				Alert.alert(
+					"Registration Successful",
+					"Please check your email for verification."
+				);
+				setIsRegistering(false);
+			}
 		} catch (error: any) {
-		Alert.alert("Registration Failed", error.message);
+			Alert.alert("Registration Failed", error.message);
 		} finally {
-		setLoading(false);
+			setLoading(false);
 		}
 	}
 
