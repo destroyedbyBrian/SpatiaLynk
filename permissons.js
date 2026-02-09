@@ -1,15 +1,24 @@
 export const PERMISSIONS = {
     'unregistered': {
-        canGeneratePrompts: false
+        canGeneratePrompts: false,
+        canViewSearchHistory: false,
+        canUpdateProfile: false,
     },
     'free_user': {
-        canGeneratePrompts: true
+        canGeneratePrompts: true,
+        canViewSearchHistory: true,
+        canUpdateProfile: true,
+
     },
     'business': {
-        canGeneratePrompts: false
+        canGeneratePrompts: false,
+        canViewSearchHistory: false,
+        canUpdateProfile: true,
     },
     'admin': {
-        canGeneratePrompts: false
+        canGeneratePrompts: false,
+        canViewSearchHistory: false,
+        canUpdateProfile: true,
     }
 }
 

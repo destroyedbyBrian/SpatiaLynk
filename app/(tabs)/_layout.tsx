@@ -1,9 +1,9 @@
-import { userAuthStore } from "@/store/userAuthStore";
+import { useUserAuthStore } from "@/store/userAuthStore";
 import { Tabs } from 'expo-router';
 import { BarChart, CheckCircle, History, LayoutDashboard, MapPin, MapPinned, User, UserRoundSearch, Users } from "lucide-react-native";
 
 export default function TabLayout() {
-    const user = userAuthStore((s) => s.user);
+    const user = useUserAuthStore((s) => s.user);
     const userRole = user?.user_metadata?.role?.toLowerCase() as 'unregistered' | 'free_user' | 'business' | 'admin';
 
     const roleBasedTabs = {

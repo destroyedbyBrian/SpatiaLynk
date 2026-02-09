@@ -10,7 +10,7 @@ export default function UserAuthLayout() {
                 }}
             />
             <Stack.Screen
-                name="signup"
+                name="privacy"
                 options={{
                     headerShown: false,
                 }}    

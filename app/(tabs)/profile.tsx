@@ -1,7 +1,7 @@
-// app/(tabs)/profile.tsx
+import { useUserAuthStore } from "@/store/userAuthStore";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { router } from "expo-router";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -21,10 +21,10 @@ import {
   SG_AREAS,
   TRANSPORT_TAGS,
 } from "../../constant/constants";
+import { hasPermission } from '../../permissons';
 import { supabase } from "../../services/supabase";
 
-export default function MeScreen() {
-  const [session, setSession] = useState<any>(null);
+export default function Profile() {
   const [currentView, setCurrentView] = useState("menu");
   const [loading, setLoading] = useState(false);
 
@@ -42,44 +42,26 @@ export default function MeScreen() {
   // History Records
   const [fullHistory, setFullHistory] = useState<any[]>([]);
 
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
-      const checkUser = async () => {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (isActive) {
-          setSession(session);
-          if (!session) {
-            setProfileData({});
-            setFullHistory([]);
-            setEditAge("");
-            setEditArea("");
-            setEditPrice("");
-            setEditInterests([]);
-            setEditTransport([]);
-            setCurrentView("menu");
-          }
-        }
-      };
-      checkUser();
-      return () => {
-        isActive = false;
-      };
-    }, []),
-  );
+  const { user, setUser } = useUserAuthStore()
+  const userRole = user?.user_metadata.role ?? 'unregistered'
 
   async function fetchProfile() {
-    if (!session?.user) return;
+    if (!user) return;
     setLoading(true);
     const { data } = await supabase
       .from("users")
       .select("*")
-      .eq("auth_id", session.user.id)
+      .eq("auth_id", user.id)
       .single();
     if (data) {
       setProfileData(data);
+      setUser({
+        ...user, 
+        user_metadata: {
+            ...user?.user_metadata,
+            role: data.role 
+        }
+      });
       setEditAge(data.age_group || "");
       setEditArea(data.area_of_residence || "");
       setEditPrice(data.price_sensitivity || "");
@@ -92,7 +74,7 @@ export default function MeScreen() {
   }
 
   async function updateProfile() {
-    if (!session?.user) return;
+    if (!user) return;
     setLoading(true);
     const { error } = await supabase
       .from("users")
@@ -103,7 +85,7 @@ export default function MeScreen() {
         interests: editInterests.join(";"),
         transportation_modes: editTransport.join(";"),
       })
-      .eq("auth_id", session.user.id);
+      .eq("auth_id", user.id);
     setLoading(false);
     if (!error) {
       Alert.alert("Success", "Profile saved successfully");
@@ -113,22 +95,21 @@ export default function MeScreen() {
   }
 
   async function fetchHistory() {
-    if (!session?.user) return;
+    if (!user) return;
     setLoading(true);
     const { data } = await supabase
       .from("search_history")
       .select("*")
-      .eq("user_id", session.user.id)
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false });
     setFullHistory(data || []);
     setLoading(false);
   }
 
   async function signOut() {
-    setSession(null);
     await supabase.auth.signOut();
+    setUser(null)
     Alert.alert("Logged Out", "You are now a guest");
-    setCurrentView("menu");
   }
 
   // Deactivate Account
@@ -142,14 +123,14 @@ export default function MeScreen() {
           text: "Confirm Deactivate",
           style: "destructive",
           onPress: async () => {
-            if (!session?.user) return;
+            if (!user) return;
             setLoading(true);
 
             // Mark as inactive
             const { error } = await supabase
               .from("users")
               .update({ is_active: false })
-              .eq("auth_id", session.user.id);
+              .eq("auth_id", user.id);
 
             setLoading(false);
 
@@ -171,16 +152,16 @@ export default function MeScreen() {
   };
 
   const handleMenuClick = (viewName: string) => {
-    if (!session) {
+    if (hasPermission(userRole) !== 'unregistered' ) {
+      setCurrentView(viewName);
+      if (viewName === "profile") fetchProfile();
+      if (viewName === "history") fetchHistory();
+    } else {
       Alert.alert("Guest Mode", "You need to log in to use this feature.", [
         { text: "Cancel", style: "cancel" },
         { text: "Login", onPress: goToLogin },
       ]);
-    } else {
-      setCurrentView(viewName);
-      if (viewName === "profile") fetchProfile();
-      if (viewName === "history") fetchHistory();
-    }
+    } 
   };
 
   if (currentView === "menu") {
@@ -190,9 +171,9 @@ export default function MeScreen() {
           <View style={styles.avatarPlaceholder}>
             <Text style={{ fontSize: 30 }}>👤</Text>
           </View>
-          <Text style={styles.username}>{session?.user?.email || "Guest"}</Text>
+          <Text style={styles.username}>{user?.email || "Guest"}</Text>
           <Text style={{ color: "#666" }}>
-            {session ? "Standard User" : "Not Logged In"}
+            {userRole}
           </Text>
         </View>
 
@@ -224,7 +205,7 @@ export default function MeScreen() {
             <Ionicons name="chevron-forward" size={24} color="#ccc" />
           </TouchableOpacity>
 
-          {session ? (
+          {user ? (
             <>
               <TouchableOpacity style={styles.menuItem} onPress={signOut}>
                 <Ionicons name="log-out-outline" size={24} color="#666" />
@@ -389,7 +370,8 @@ export default function MeScreen() {
     );
   }
 
-  return <View />;
+  return <View />
+  ;
 }
 
 const styles = StyleSheet.create({
