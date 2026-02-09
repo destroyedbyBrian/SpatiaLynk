@@ -1,5 +1,5 @@
-const API_BASE_URL = 'https://destroyedbyBrian-spatialynk.hf.space';
-
+// const API_BASE_URL = 'https://destroyedbyBrian-spatialynk.hf.space';
+const API_BASE_URL = 'https://destroyedbybrian-spatialynk-2-0.hf.space';
 
 export interface Location {
   latitude: number;

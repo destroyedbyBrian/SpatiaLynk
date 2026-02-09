@@ -8,7 +8,7 @@
 import { AppleMaps } from 'expo-maps';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useRecommendationStore } from '../store/recommendationStore';
+import { useRecommendationStore } from '../../store/recommendationStore';
 
 type MapLevel = 0 | 1 | 2 | 3;
 
