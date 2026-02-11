@@ -1,3 +1,4 @@
+import { useRecommendationStore } from "@/store/recommendationStore";
 import { useUserAuthStore } from "@/store/userAuthStore";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -43,6 +44,7 @@ export default function Profile() {
   const [fullHistory, setFullHistory] = useState<any[]>([]);
 
   const { user, setUser } = useUserAuthStore()
+  const clearRecommendations = useRecommendationStore((s) => s.clearRecommendations)
   const userRole = user?.user_metadata.role ?? 'unregistered'
 
   async function fetchProfile() {
@@ -109,6 +111,7 @@ export default function Profile() {
   async function signOut() {
     await supabase.auth.signOut();
     setUser(null)
+    clearRecommendations()
     Alert.alert("Logged Out", "You are now a guest");
   }
 
@@ -375,7 +378,7 @@ export default function Profile() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f8f9fa" },
+  container: { flex: 1, backgroundColor: "#f8f9fa", paddingTop: 20 },
   header: {
     alignItems: "center",
     padding: 40,
@@ -412,7 +415,7 @@ const styles = StyleSheet.create({
   subPageContainer: {
     flex: 1,
     padding: 20,
-    paddingTop: 60, // ✅ Fixed here
+    paddingTop: 60,
     backgroundColor: "#f8f9fa",
   },
   backButton: { flexDirection: "row", alignItems: "center", marginBottom: 20 },

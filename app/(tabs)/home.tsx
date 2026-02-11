@@ -1,6 +1,8 @@
 import RecommendationCard from "@/components/rating";
-import { SafeAreaContainer } from "@/constant/GlobalStyles";
-import { useUserAuthStore } from "@/store/userAuthStore";
+import { SafeAreaContainer } from '@/constant/GlobalStyles';
+import { hasPermission } from '@/permissons';
+import { supabase } from '@/services/supabase';
+import { useUserAuthStore } from '@/store/userAuthStore';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useRouter } from "expo-router";
@@ -14,38 +16,48 @@ import {
   ScrollView,
   Text,
   TextInput,
+  TouchableOpacity,
   TouchableWithoutFeedback,
   View
 } from "react-native";
 import { styled } from "styled-components";
 import {
   checkAPIHealth,
+  Explanation,
   getRecommendations,
+  POIInfo,
   RecommendationResponse
 } from '../../services/MPRApi';
 import { useRecommendationStore } from '../../store/recommendationStore';
 
+let SIM_LOCATION = {"latitude": 1.329, "longitude": 103.776}
 
-export default function Index() {
+export default function RecommendationTabs() {
   const router = useRouter();
+  
   const rs = useRecommendationStore(s => s.recommendations);
+  const level0 = useRecommendationStore(s => s.level0);
+  const level1 = useRecommendationStore(s => s.level1);
+  const level2 = useRecommendationStore(s => s.level2);
   const explanations0 = useRecommendationStore(s => s.explanations0);
+  const explanations1 = useRecommendationStore(s => s.explanations1);
+  const explanations2 = useRecommendationStore(s => s.explanations2);
+  const selectedLevel = useRecommendationStore(s => s.selectedLevel);
+  const setSelectedLevel = useRecommendationStore(s => s.setSelectedLevel);
   const loading = useRecommendationStore(s => s.loading);
   const setLoading = useRecommendationStore(s => s.setLoading);
   const setRecommendations = useRecommendationStore(s => s.setRecommendations);
+  const setUserLocation = useRecommendationStore(s => s.setUserLocation);
+  const userLocation = useRecommendationStore(s => s.userLocation);
+  const setSelectedPOI = useRecommendationStore(s => s.setSelectedPOI);
+  
   const [prompt, setPrompt] = useState<string>("");
-  const { userLocation, setUserLocation } = useRecommendationStore();
   const [showKeyboard, setShowKeyboard] = useState<boolean>(false);
   const [expandedPOI, setExpandedPOI] = useState<string | null>(null);
-
+  
   const { user } = useUserAuthStore()
   const userId = user?.id
-  
-  const suggestedPrompts = [
-    "Things to do Near Me",
-    "Cafes Near Me",
-    "Gyms Near Me",
-  ];
+  const isHydrated = useUserAuthStore((s) => s.isHydrated);
 
   useEffect(() => {
     async function getCurrentLocation() {
@@ -54,16 +66,33 @@ export default function Index() {
         console.error('Permission to access location was denied');
         return;
       }
-      let location = await Location.getCurrentPositionAsync({});
       setUserLocation({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      });
+        latitude: SIM_LOCATION.latitude,
+        longitude: SIM_LOCATION.longitude
+      })
     }
 
     getCurrentLocation();
     checkAPIHealth();
   }, []);
+
+  if (!isHydrated) {
+    return (
+      <SafeAreaContainer>
+        <LoadingContainer>
+          <ActivityIndicator size="large" color="#0E6DE8" />
+        </LoadingContainer>
+      </SafeAreaContainer>
+    );
+  }
+
+  const userRole = (user?.user_metadata?.role as string)?.toLowerCase() ?? 'unregistered';
+  
+  const suggestedPrompts = [
+    "Things to do Near Me",
+    "Cafes Near Me",
+    "Gyms Near Me",
+  ];
 
   const handleSuggestion = (item: string) => {
     setPrompt(item);
@@ -72,16 +101,34 @@ export default function Index() {
   };
 
   const handleRecommendations = async () => {
+    if (!hasPermission(userRole, 'canGeneratePrompts')) {
+      Alert.alert('Login Required', 'Please log in to generate recommendations');
+      router.navigate('/(user-auth)/login')
+      return;
+    }
+
     if (!prompt.trim()) {
       Alert.alert('Empty Search', 'Please enter a search query');
       return;
     }
-    
+
     setLoading(true);
-    
+
     try {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('user_id')
+        .eq("auth_id", userId)
+        .single();
+
+      if (userError || !userData?.user_id) {
+        console.error('Failed to fetch user_id:', userError);
+        Alert.alert('Error', 'Unable to verify account. Please try again.');
+        return; 
+      }
+
       const response: RecommendationResponse = await getRecommendations({
-        userId: userId?? 'unregistered',
+        userId: userData.user_id,
         prompt: prompt.trim(),
         currentLocation: userLocation ? {
           latitude: userLocation.latitude,
@@ -90,14 +137,27 @@ export default function Index() {
       });
 
       setRecommendations(response);
-      console.log('Recommendations saved to state');
+      setSelectedLevel(0); 
 
-      router.navigate('/map');
-      
       Alert.alert(
         'Success!', 
-        `Found ${response.recommendations.level_0.length} individual places for you!`
+        `Found ${response.recommendations.level_0.length} places, ${response.recommendations.level_1.length} areas, and ${response.recommendations.level_2.length} districts!`
       );
+
+      setPrompt('')
+
+      const payload = {
+        user_id: userId,
+        search_query: prompt.trim(),
+        created_at: new Date().toISOString(),
+      };
+
+      const { error } = await supabase
+        .from("search_history")
+        .insert(payload);
+
+      if (error) console.error('Failed to save search history:', error)
+
     } catch (err) {
       Alert.alert('Error', 'Failed to get recommendations. Please try again.');
       console.error(err);
@@ -107,22 +167,256 @@ export default function Index() {
   };
 
   const handleOutsidePress = () => {
+    if (loading || (rs && rs.recommendations.level_0?.length > 0)) {
+      return;
+    }
     if (showKeyboard) {
       setShowKeyboard(false);
       Keyboard.dismiss();
     }
   };
 
-  // Get explanation for a specific POI
-  const getExplanationForPOI = (poiId: string) => {
-    return explanations0.find(exp => exp.poi_id === poiId);
+  const getCurrentLevelData = (): POIInfo[] => {
+    switch(selectedLevel) {
+      case 0: return level0;
+      case 1: return level1;
+      case 2: return level2;
+      default: return [];
+    }
   };
 
-  // Toggle expanded state
+  const getCurrentExplanations = (): Explanation[] => {
+    switch(selectedLevel) {
+      case 0: return explanations0;
+      case 1: return explanations1;
+      case 2: return explanations2;
+      default: return [];
+    }
+  };
+
+  const getExplanationForPOI = (poiId: string) => {
+    return getCurrentExplanations().find(exp => exp.poi_id === poiId);
+  };
+
   const toggleExpanded = (poiId: string) => {
     setExpandedPOI(expandedPOI === poiId ? null : poiId);
   };
 
+  const renderLevelTabs = () => (
+    <LevelSelector>
+      <LevelTab 
+        active={selectedLevel === 0} 
+        onPress={() => setSelectedLevel(0)}
+      >
+        <LevelTabText active={selectedLevel === 0}>Places</LevelTabText>
+        <LevelCount active={selectedLevel === 0}>{level0.length}</LevelCount>
+      </LevelTab>
+      <LevelTab 
+        active={selectedLevel === 1} 
+        onPress={() => setSelectedLevel(1)}
+      >
+        <LevelTabText active={selectedLevel === 1}>Areas</LevelTabText>
+        <LevelCount active={selectedLevel === 1}>{level1.length}</LevelCount>
+      </LevelTab>
+      <LevelTab 
+        active={selectedLevel === 2} 
+        onPress={() => setSelectedLevel(2)}
+      >
+        <LevelTabText active={selectedLevel === 2}>Districts</LevelTabText>
+        <LevelCount active={selectedLevel === 2}>{level2.length}</LevelCount>
+      </LevelTab>
+    </LevelSelector>
+  );
+
+  const renderDistrictCard = (item: POIInfo) => (
+    <DistrictCard key={item.poi_id}>
+      <DistrictHeader>
+        <View style={{ flex: 1 }}>
+          <DistrictName>🏙️ {item.name}</DistrictName>
+          {item.details?.description && (
+            <DistrictDescription>{item.details.description}</DistrictDescription>
+          )}
+        </View>
+        <DistrictBadge>
+          <MaterialIcons name="star" size={14} color="white" />
+          <DistrictScore>{item.score.toFixed(2)}</DistrictScore>
+        </DistrictBadge>
+      </DistrictHeader>
+      
+      <DistrictMeta>
+        <MetaItem>
+          <MaterialIcons name="location-city" size={16} color="rgba(255,255,255,0.8)" />
+          <MetaText>Regional District</MetaText>
+        </MetaItem>
+        <MetaItem>
+          <MaterialIcons name="analytics" size={16} color="rgba(255,255,255,0.8)" />
+          <MetaText>Score: {(item.score * 100).toFixed(0)}% match</MetaText>
+        </MetaItem>
+      </DistrictMeta>
+
+      <ExploreButton onPress={() => {
+        setSelectedPOI(item);
+        router.navigate('/map');
+      }}>
+        <ExploreButtonText>Explore District</ExploreButtonText>
+        <MaterialIcons name="arrow-forward" size={18} color="#0E6DE8" />
+      </ExploreButton>
+    </DistrictCard>
+  );
+
+  const renderStreetCard = (item: POIInfo) => {
+    const explanation = getExplanationForPOI(item.poi_id);
+    const isExpanded = expandedPOI === item.poi_id;
+
+    return (
+      <StreetCard key={item.poi_id}>
+        <StreetHeader>
+          <View style={{ flex: 1 }}>
+            <StreetName>🛣️ {item.name}</StreetName>
+            <StreetSubtitle>
+              {item.type} • {item.details?.district || 'Unknown District'}
+            </StreetSubtitle>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <StreetScore>{item.score.toFixed(2)}</StreetScore>
+            <Text style={{ fontSize: 11, color: '#FFB800' }}>Match Score</Text>
+          </View>
+        </StreetHeader>
+
+        {explanation && (
+          <>
+            <ExplanationToggle onPress={() => toggleExpanded(item.poi_id)}>
+              <ExplanationToggleText>
+                {isExpanded ? '▼' : '▶'} Why this area?
+              </ExplanationToggleText>
+            </ExplanationToggle>
+
+            {isExpanded && (
+              <ExplanationContainer>
+                <ExplanationText>{explanation.human_explanation}</ExplanationText>
+                {explanation.top_factors && explanation.top_factors.length > 0 && (
+                  <FactorsContainer>
+                    <FactorsTitle>Key Factors:</FactorsTitle>
+                    {explanation.top_factors.map((factor, index) => (
+                      <FactorItem key={index}>
+                        <FactorBullet>•</FactorBullet>
+                        <FactorText>{factor}</FactorText>
+                      </FactorItem>
+                    ))}
+                  </FactorsContainer>
+                )}
+              </ExplanationContainer>
+            )}
+          </>
+        )}
+
+        <StreetActions>
+          <ActionButton onPress={() => {
+            setSelectedPOI(item);
+            router.navigate('/map');
+          }}>
+            <MaterialIcons name="map" size={18} color="#0E6DE8" />
+            <ActionButtonText>View Area</ActionButtonText>
+          </ActionButton>
+        </StreetActions>
+      </StreetCard>
+    );
+  };
+
+  const renderPOICard = (item: POIInfo) => {
+    const explanation = getExplanationForPOI(item.poi_id);
+    const isExpanded = expandedPOI === item.poi_id;
+
+    return (
+      <POICard key={item.poi_id}>
+        <POIMainInfo>
+          <POIName>{item.name}</POIName>
+          
+          <POIDetailsRow>
+            <POICategory>{item.details?.category || 'Place'}</POICategory>
+            {item.details?.price && (
+              <POIPrice>💰 {item.details.price}</POIPrice>
+            )}
+          </POIDetailsRow>
+
+          <POIDetailsRow>
+            <POIRegion>📍 {item.details?.region || 'Nearby'}</POIRegion>
+            <View style={{ flexDirection: "row", alignItems: 'center' }}>
+              <MaterialIcons name="star" size={16} color="#FFB800" />
+              <POIScore>{item.score.toFixed(2)}</POIScore>
+            </View>
+          </POIDetailsRow>
+        </POIMainInfo>
+
+        {explanation && (
+          <>
+            <ExplanationToggle onPress={() => toggleExpanded(item.poi_id)}>
+              <ExplanationToggleText>
+                {isExpanded ? '▼' : '▶'} Why recommended?
+              </ExplanationToggleText>
+            </ExplanationToggle>
+
+            {isExpanded && (
+              <ExplanationContainer>
+                <ExplanationText>{explanation.human_explanation}</ExplanationText>
+                {explanation.top_factors && explanation.top_factors.length > 0 && (
+                  <FactorsContainer>
+                    <FactorsTitle>Key Factors:</FactorsTitle>
+                    {explanation.top_factors.map((factor, index) => (
+                      <FactorItem key={index}>
+                        <FactorBullet>•</FactorBullet>
+                        <FactorText>{factor}</FactorText>
+                      </FactorItem>
+                    ))}
+                  </FactorsContainer>
+                )}
+              </ExplanationContainer>
+            )}
+          </>
+        )}
+
+        <ActionsContainer>
+          <ActionButton onPress={() => {
+            setSelectedPOI(item);
+            router.navigate('/map');
+          }}>
+            <MaterialIcons name="location-pin" size={20} color="#0E6DE8" />
+            <ActionButtonText>Map</ActionButtonText>
+          </ActionButton>
+
+          <ActionButton onPress={() => {
+            Alert.alert(
+              item.name,
+              explanation?.human_explanation || 'No explanation available',
+              [{ text: 'OK' }]
+            );
+          }}>
+            <MaterialIcons name="info-outline" size={20} color="#666" />
+            <ActionButtonText>Details</ActionButtonText>
+          </ActionButton>
+        </ActionsContainer>
+
+        <RecommendationCard poiId={item.poi_id} />
+      </POICard>
+    );
+  };
+
+  const renderCard = (item: POIInfo) => {
+    switch(selectedLevel) {
+      case 0: return renderPOICard(item);
+      case 1: return renderStreetCard(item);
+      case 2: return renderDistrictCard(item);
+      default: return null;
+    }
+  };
+
+  const getLevelLabel = () => {
+    switch(selectedLevel) {
+      case 0: return 'individual places';
+      case 1: return 'areas & streets';
+      case 2: return 'districts';
+    }
+  };
 
   return (
     <TouchableWithoutFeedback onPress={handleOutsidePress}>
@@ -132,118 +426,29 @@ export default function Index() {
             <ActivityIndicator size="large" color="#0E6DE8" />
             <Text style={{ marginTop: 12, color: '#666' }}>Getting recommendations...</Text>
           </LoadingContainer>
-        ) : rs && rs.recommendations.level_0 && rs.recommendations.level_0.length > 0 ? (
+        ) : rs && getCurrentLevelData().length > 0 ? (
           <ResultsScrollView>
             <ResultsHeader>
-              <ResultsTitle>Found {rs.recommendations.level_0.length} places</ResultsTitle>
-              <ViewMapButton onPress={() => router.navigate('/map')}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <ViewMapButtonText>View on Map</ViewMapButtonText>
-                  <MaterialIcons name="map" size={20} color="white" />
-                </View>
-              </ViewMapButton>
+              <ResultsTitle>Recommendations</ResultsTitle>
+              {renderLevelTabs()}
+              <ResultsSummary>
+                Showing {getCurrentLevelData().length} {getLevelLabel()} near you
+              </ResultsSummary>
             </ResultsHeader>
 
-            {rs.recommendations.level_0.map((poi) => {
-              const explanation = getExplanationForPOI(poi.poi_id);
-              const isExpanded = expandedPOI === poi.poi_id;
-
-              return (
-                <POICard key={poi.poi_id}>
-                  {/* Main POI Info */}
-                  <POIMainInfo>
-                    <POIName>{poi.name}</POIName>
-                    
-                    <POIDetailsRow>
-                      <POICategory>{poi.details.category}</POICategory>
-                      {poi.details.price && (
-                        <POIPrice>${poi.details.price}</POIPrice>
-                      )}
-                    </POIDetailsRow>
-
-                    <POIDetailsRow>
-                      {poi.details.region && (
-                        <POIRegion>📍 {poi.details.region}</POIRegion>
-                      )}
-                      <View style={{ flexDirection: "row", alignItems: 'center', gap: '4' }}>
-                        <MaterialIcons name="star" size={20} color="red" />
-                        <POIScore>Score: {poi.score.toFixed(2)}</POIScore>
-                      </View>
-                    </POIDetailsRow>
-                  </POIMainInfo>
-
-                  {/* Explanation Section */}
-                  {explanation && (
-                    <>
-                      <ExplanationToggle onPress={() => toggleExpanded(poi.poi_id)}>
-                        <ExplanationToggleText>
-                          {isExpanded ? '▼' : '▶'} Why this recommendation?
-                        </ExplanationToggleText>
-                      </ExplanationToggle>
-
-                      {isExpanded && (
-                        <ExplanationContainer>
-                          {/* Human-readable explanation */}
-                          <ExplanationText>{explanation.human_explanation}</ExplanationText>
-
-                          {/* Top factors */}
-                          {explanation.top_factors && explanation.top_factors.length > 0 && (
-                            <FactorsContainer>
-                              <FactorsTitle>Key Factors:</FactorsTitle>
-                              {explanation.top_factors.map((factor, index) => (
-                                <FactorItem key={index}>
-                                  <FactorBullet>•</FactorBullet>
-                                  <FactorText>{factor}</FactorText>
-                                </FactorItem>
-                              ))}
-                            </FactorsContainer>
-                          )}
-                        </ExplanationContainer>
-                      )}
-                    </>
-                  )}
-
-                  {/* Quick Actions */}
-                  <ActionsContainer>
-                    <ActionButton onPress={() => {
-                      // Navigate to map and highlight this POI
-                      useRecommendationStore.getState().setSelectedPOI(poi);
-                      router.navigate('/map');
-                    }}>
-                      <MaterialIcons name="location-pin" size={20} color="red" />
-                      <ActionButtonText>
-                        Show on Map
-                      </ActionButtonText>
-                    </ActionButton>
-
-                    <ActionButton onPress={() => {
-                      Alert.alert(
-                        poi.name,
-                        explanation?.human_explanation || 'No explanation available',
-                        [{ text: 'OK' }]
-                      );
-                    }}>
-                      <MaterialIcons name="info" size={20} color="gray" />
-                      <ActionButtonText>Explain POI</ActionButtonText>
-                    </ActionButton>
-                  </ActionsContainer>
-                  
-                  <RecommendationCard poiId={poi.poi_id} />
-                  
-                </POICard>
-              );
-            })}
+            {getCurrentLevelData().map((item) => renderCard(item))}
+            
+            <View style={{ height: 100 }} />
           </ResultsScrollView>
         ) : (
           <EmptyStateContainer>
+            <MaterialIcons name="account-tree" size={48} color="#CCC" />
             <EmptyStateText>
-              No recommendations available.{'\n'}
-              Search for places to get started!
+              Search for places to get personalized recommendations across districts, areas, and specific venues.
             </EmptyStateText>
           </EmptyStateContainer>
         )}
 
-        {/* Suggested Prompts */}
         {!prompt && (
           <SuggestedScrollView 
             horizontal={true} 
@@ -258,18 +463,20 @@ export default function Index() {
           </SuggestedScrollView>
         )}
 
-        {/* Search Input */}
         <PromptTextInputWrapper $keyboard={showKeyboard} onStartShouldSetResponder={() => true}>
           <PromptText 
             onChangeText={setPrompt}
             value={prompt}
-            placeholder="Search for activities or areas"
+            placeholder="Search for activities or areas..."
             placeholderTextColor={"#878787"}
             multiline={true}
             onFocus={() => setShowKeyboard(true)}
           />
           {prompt && (
-            <IconContainer onPress={handleRecommendations}>
+            <IconContainer 
+              onPress={handleRecommendations}
+              hitSlop={{ top: 30, bottom: 30, left: 30, right: 30 }} 
+            >
               <ArrowUp size={24} color={'white'} />
             </IconContainer>
           )}
@@ -279,7 +486,6 @@ export default function Index() {
   );
 }
 
-// Styled Components
 const LoadingContainer = styled(View)`
   flex: 1;
   justify-content: center;
@@ -288,8 +494,8 @@ const LoadingContainer = styled(View)`
 
 const ResultsScrollView = styled(ScrollView)`
   flex: 1;
+  padding-horizontal: 4px;
   margin-top: 20px;
-  margin-bottom: 100px;
 `;
 
 const ResultsHeader = styled(View)`
@@ -297,26 +503,190 @@ const ResultsHeader = styled(View)`
 `;
 
 const ResultsTitle = styled(Text)`
-  font-size: 24px;
+  font-size: 28px;
   font-weight: bold;
   color: #333;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 `;
 
-const ViewMapButton = styled(Pressable)`
-  background-color: #0E6DE8;
-  padding: 12px;
+const LevelSelector = styled(View)`
+  flex-direction: row;
+  background-color: #F5F5F5;
   border-radius: 12px;
+  margin-bottom: 16px;
+  padding: 4px;
+`;
+
+const LevelTab = styled(Pressable)<{ active: boolean }>`
+  flex: 1;
+  padding-vertical: 8px;
+  padding-horizontal: 4px;
+  border-radius: 8px;
+  background-color: ${props => props.active ? 'white' : 'transparent'};
   align-items: center;
+  flex-direction: row;
+  justify-content: center;
+  gap: 4px;
+  shadow-color: ${props => props.active ? '#000' : 'transparent'};
+  shadow-offset: ${props => props.active ? '0px 2px' : '0px 0px'};
+  shadow-opacity: ${props => props.active ? 0.1 : 0};
+  elevation: ${props => props.active ? 2 : 0};
+`;
+
+const LevelTabText = styled(Text)<{ active: boolean }>`
+  font-size: 14px;
+  font-weight: ${props => props.active ? '600' : '400'};
+  color: ${props => props.active ? '#0E6DE8' : '#666'};
+`;
+
+const LevelCount = styled(Text)<{ active: boolean }>`
+  font-size: 12px;
+  font-weight: 600;
+  color: ${props => props.active ? '#0E6DE8' : '#999'};
+  background-color: ${props => props.active ? '#E3F2FD' : '#E0E0E0'};
+  padding-horizontal: 6px;
+  padding-vertical: 2px;
+  border-radius: 10px;
+  margin-left: 4px;
+`;
+
+const ResultsSummary = styled(Text)`
+  font-size: 14px;
+  color: #666;
+  text-align: center;
   margin-bottom: 8px;
 `;
 
-const ViewMapButtonText = styled(Text)`
-  color: white;
-  font-size: 16px;
-  font-weight: 600;
+// Level 2: District Styles
+const DistrictCard = styled(View)`
+  background-color: #0E6DE8;
+  padding: 20px;
+  border-radius: 16px;
+  margin-bottom: 12px;
+  shadow-color: #0E6DE8;
+  shadow-offset: 0px 4px;
+  shadow-opacity: 0.3;
+  shadow-radius: 8px;
+  elevation: 5;
 `;
 
+const DistrictHeader = styled(View)`
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+`;
+
+const DistrictName = styled(Text)`
+  font-size: 20px;
+  font-weight: bold;
+  color: white;
+  flex: 1;
+  margin-right: 12px;
+`;
+
+const DistrictDescription = styled(Text)`
+  color: rgba(255,255,255,0.85);
+  font-size: 14px;
+  margin-top: 4px;
+  line-height: 20px;
+`;
+
+const DistrictBadge = styled(View)`
+  background-color: rgba(255,255,255,0.2);
+  padding-horizontal: 10px;
+  padding-vertical: 6px;
+  border-radius: 20px;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+`;
+
+const DistrictScore = styled(Text)`
+  color: white;
+  font-weight: 700;
+  font-size: 14px;
+`;
+
+const DistrictMeta = styled(View)`
+  flex-direction: row;
+  gap: 16px;
+  margin-bottom: 16px;
+  margin-top: 4px;
+`;
+
+const MetaItem = styled(View)`
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+`;
+
+const MetaText = styled(Text)`
+  color: rgba(255,255,255,0.8);
+  font-size: 13px;
+`;
+
+const ExploreButton = styled(Pressable)`
+  background-color: white;
+  padding: 12px;
+  border-radius: 10px;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+`;
+
+const ExploreButtonText = styled(Text)`
+  color: #0E6DE8;
+  font-weight: 700;
+  font-size: 15px;
+`;
+
+// Level 1: Street Styles
+const StreetCard = styled(View)`
+  background-color: white;
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  border-left-width: 4px;
+  border-left-color: #FFB800;
+  shadow-color: #000;
+  shadow-offset: 0px 2px;
+  shadow-opacity: 0.05;
+  shadow-radius: 4px;
+  elevation: 2;
+`;
+
+const StreetHeader = styled(View)`
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+`;
+
+const StreetName = styled(Text)`
+  font-size: 17px;
+  font-weight: 700;
+  color: #333;
+`;
+
+const StreetSubtitle = styled(Text)`
+  font-size: 13px;
+  color: #666;
+  margin-top: 2px;
+`;
+
+const StreetScore = styled(Text)`
+  font-size: 18px;
+  font-weight: bold;
+  color: #FFB800;
+`;
+
+const StreetActions = styled(View)`
+  margin-top: 12px;
+`;
+
+// Level 0: POI Styles
 const POICard = styled(View)`
   background-color: white;
   padding: 16px;
@@ -326,9 +696,9 @@ const POICard = styled(View)`
   border-color: #e0e0e0;
   shadow-color: #000;
   shadow-offset: 0px 2px;
-  shadow-opacity: 0.1;
+  shadow-opacity: 0.05;
   shadow-radius: 4px;
-  elevation: 3;
+  elevation: 2;
 `;
 
 const POIMainInfo = styled(View)`
@@ -337,7 +707,7 @@ const POIMainInfo = styled(View)`
 
 const POIName = styled(Text)`
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
   color: #333;
   margin-bottom: 8px;
 `;
@@ -352,31 +722,39 @@ const POIDetailsRow = styled(View)`
 const POICategory = styled(Text)`
   font-size: 14px;
   color: #0E6DE8;
-  font-weight: 500;
+  font-weight: 600;
+  background-color: #E3F2FD;
+  padding-horizontal: 8px;
+  padding-vertical: 2px;
+  border-radius: 4px;
 `;
 
 const POIPrice = styled(Text)`
   font-size: 14px;
-  color: black;
+  color: #2E7D32;
   font-weight: 600;
 `;
 
 const POIRegion = styled(Text)`
-  font-size: 12px;
+  font-size: 13px;
   color: #666;
 `;
 
 const POIScore = styled(Text)`
-  font-size: 12px;
-  color: black;
-  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+  font-weight: 700;
+  margin-left: 4px;
 `;
 
+// Shared Components
 const ExplanationToggle = styled(Pressable)`
-  padding: 8px;
+  padding: 10px;
   background-color: #F5F5F5;
   border-radius: 8px;
   margin-bottom: 8px;
+  flex-direction: row;
+  align-items: center;
 `;
 
 const ExplanationToggleText = styled(Text)`
@@ -387,7 +765,7 @@ const ExplanationToggleText = styled(Text)`
 
 const ExplanationContainer = styled(View)`
   background-color: #F9F9F9;
-  padding: 12px;
+  padding: 14px;
   border-radius: 8px;
   border-left-width: 3px;
   border-left-color: #0E6DE8;
@@ -397,18 +775,18 @@ const ExplanationContainer = styled(View)`
 const ExplanationText = styled(Text)`
   font-size: 14px;
   line-height: 20px;
-  color: #333;
-  margin-bottom: 12px;
+  color: #444;
+  margin-bottom: 10px;
 `;
 
 const FactorsContainer = styled(View)`
-  margin-top: 8px;
+  margin-top: 4px;
 `;
 
 const FactorsTitle = styled(Text)`
   font-size: 13px;
-  font-weight: 600;
-  color: #666;
+  font-weight: 700;
+  color: #333;
   margin-bottom: 6px;
 `;
 
@@ -428,6 +806,7 @@ const FactorText = styled(Text)`
   font-size: 13px;
   color: #555;
   flex: 1;
+  line-height: 18px;
 `;
 
 const ActionsContainer = styled(View)`
@@ -435,25 +814,20 @@ const ActionsContainer = styled(View)`
   gap: 8px;
 `;
 
-export const ActionsRow = styled(View)`
-  flex-direction: row;
-  padding-top: 8px;
-`
-
-export const ActionButton = styled(Pressable)`
+const ActionButton = styled(Pressable)`
   flex: 1;
   flex-direction: row;
   justify-content: center;
   background-color: #F5F5F5;
-  padding: 14px;
+  padding: 12px;
   border-radius: 8px;
   align-items: center;
   border-width: 1px;
   border-color: #E0E0E0;
-  gap: 4px;
+  gap: 6px;
 `;
 
-export const ActionButtonText = styled(Text)`
+const ActionButtonText = styled(Text)`
   font-size: 14px;
   font-weight: 600;
   color: #333;
@@ -471,6 +845,7 @@ const EmptyStateText = styled(Text)`
   color: #666;
   text-align: center;
   line-height: 24px;
+  margin-top: 16px;
 `;
 
 const PromptTextInputWrapper = styled(View)<{ $keyboard?: boolean}>`
@@ -485,8 +860,9 @@ const PromptTextInputWrapper = styled(View)<{ $keyboard?: boolean}>`
   align-self: center;
   position: absolute;
   bottom: ${props => props.$keyboard ? '270px' : '40px'};
-  width: 100%;
+  width: 95%;
   background-color: #F5F5F5;
+  margin-horizontal: 10px;
 `;
 
 const PromptText = styled(TextInput)`
@@ -494,16 +870,19 @@ const PromptText = styled(TextInput)`
   text-align: left;
   line-height: 24px;
   padding: 0;
+  padding-right: 50px;
+  min-height: 30px;
 `;
 
-const IconContainer = styled(Pressable)`
+const IconContainer = styled(TouchableOpacity)`
   background-color: #0E6DE8;
   justify-content: center;
   align-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 15px;
+  width: 36px;
+  height: 36px;
+  border-radius: 24px;
   position: absolute;
+  z-index: 10;
   right: 10px;
   bottom: 10px;
 `;
@@ -526,3 +905,4 @@ const SuggestedPromptsText = styled(Text)`
   font-weight: 600;
   padding: 14px;
 `;
+

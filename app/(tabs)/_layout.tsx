@@ -1,9 +1,20 @@
 import { useUserAuthStore } from "@/store/userAuthStore";
 import { Tabs } from 'expo-router';
 import { BarChart, CheckCircle, History, LayoutDashboard, MapPin, MapPinned, User, UserRoundSearch, Users } from "lucide-react-native";
+import { ActivityIndicator, View } from "react-native";
 
 export default function TabLayout() {
     const user = useUserAuthStore((s) => s.user);
+    const isHydrated = useUserAuthStore((s) => s.isHydrated)
+
+    if (!isHydrated) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" />
+            </View>
+        );
+    }
+
     const userRole = user?.user_metadata?.role?.toLowerCase() as 'unregistered' | 'free_user' | 'business' | 'admin';
 
     const roleBasedTabs = {

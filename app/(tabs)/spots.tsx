@@ -1,18 +1,18 @@
-// app/(business)/spots.tsx
+import { SafeAreaContainer } from "@/constant/GlobalStyles";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Image,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { supabase } from "../../services/supabase";
 
@@ -285,6 +285,7 @@ export default function MySpotsScreen() {
         : "https://via.placeholder.com/150";
 
     return (
+     
       <View style={styles.card}>
         <Image source={{ uri: displayImage }} style={styles.cardImage} />
         <View style={styles.cardContent}>
@@ -337,218 +338,220 @@ export default function MySpotsScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Shops Management</Text>
-        <TouchableOpacity style={styles.addBtn} onPress={() => openModal()}>
-          <Ionicons name="add" size={24} color="white" />
-        </TouchableOpacity>
-      </View>
+    <SafeAreaContainer>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>My Shops Management</Text>
+          <TouchableOpacity style={styles.addBtn} onPress={() => openModal()}>
+            <Ionicons name="add" size={24} color="white" />
+          </TouchableOpacity>
+        </View>
 
-      {loading && spots.length === 0 ? (
-        <ActivityIndicator size="large" style={{ marginTop: 50 }} />
-      ) : (
-        <FlatList
-          data={spots}
-          keyExtractor={(item) => item.poi_id}
-          renderItem={renderItem}
-          contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>
-              No shops yet. Click &apos;+&apos; to add one.
-            </Text>
-          }
-        />
-      )}
+        {loading && spots.length === 0 ? (
+          <ActivityIndicator size="large" style={{ marginTop: 50 }} />
+        ) : (
+          <FlatList
+            data={spots}
+            keyExtractor={(item) => item.poi_id}
+            renderItem={renderItem}
+            contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>
+                No shops yet. Click &apos;+&apos; to add one.
+              </Text>
+            }
+          />
+        )}
 
-      {/* Main Edit/Add Modal */}
-      <Modal visible={modalVisible} animationType="slide" transparent={true}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {isEditing ? "Edit Shop" : "Add New Shop"}
-            </Text>
+        {/* Main Edit/Add Modal */}
+        <Modal visible={modalVisible} animationType="slide" transparent={true}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>
+                {isEditing ? "Edit Shop" : "Add New Shop"}
+              </Text>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.label}>Shop Name *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. Book Bar"
-                value={name}
-                onChangeText={setName}
-              />
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Text style={styles.label}>Shop Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. Book Bar"
+                  value={name}
+                  onChangeText={setName}
+                />
 
-              <Text style={styles.label}>Category</Text>
-              <View style={styles.categoryRow}>
-                {["Food", "Retail", "Service", "Fun"].map((cat) => (
-                  <TouchableOpacity
-                    key={cat}
-                    style={[
-                      styles.catChip,
-                      category === cat && styles.catChipActive,
-                    ]}
-                    onPress={() => setCategory(cat)}
-                  >
-                    <Text
+                <Text style={styles.label}>Category</Text>
+                <View style={styles.categoryRow}>
+                  {["Food", "Retail", "Service", "Fun"].map((cat) => (
+                    <TouchableOpacity
+                      key={cat}
                       style={[
-                        styles.catText,
-                        category === cat && styles.catTextActive,
+                        styles.catChip,
+                        category === cat && styles.catChipActive,
                       ]}
+                      onPress={() => setCategory(cat)}
                     >
-                      {cat}
-                    </Text>
+                      <Text
+                        style={[
+                          styles.catText,
+                          category === cat && styles.catTextActive,
+                        ]}
+                      >
+                        {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={styles.label}>Street Address *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. 123 Orchard Road"
+                  value={address}
+                  onChangeText={setAddress}
+                />
+
+                {/* District Dropdown */}
+                <Text style={styles.label}>District</Text>
+                <TouchableOpacity
+                  style={[styles.input, { justifyContent: "center" }]}
+                  onPress={() => setShowDistrictPicker(true)}
+                >
+                  <Text style={{ color: district ? "#000" : "#999" }}>
+                    {district || "Select District"}
+                  </Text>
+                  <Ionicons
+                    name="chevron-down"
+                    size={20}
+                    color="#999"
+                    style={{ position: "absolute", right: 10 }}
+                  />
+                </TouchableOpacity>
+
+                <Text style={styles.label}>Region</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. Central"
+                  value={region}
+                  onChangeText={setRegion}
+                />
+
+                {/* Price Range */}
+                <Text style={styles.label}>Price Range ($)</Text>
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Min (e.g. 10)"
+                      keyboardType="numeric"
+                      value={priceMin}
+                      onChangeText={setPriceMin}
+                    />
+                  </View>
+                  <Text>-</Text>
+                  <View style={{ flex: 1 }}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Max (e.g. 50)"
+                      keyboardType="numeric"
+                      value={priceMax}
+                      onChangeText={setPriceMax}
+                    />
+                  </View>
+                </View>
+
+                <Text style={styles.label}>Image URL</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="https://..."
+                  value={imageUrl}
+                  onChangeText={setImageUrl}
+                  autoCapitalize="none"
+                />
+
+                <Text style={styles.label}>Description / Characteristic *</Text>
+                <TextInput
+                  style={[styles.input, { height: 80, textAlignVertical: "top" }]}
+                  placeholder="Describe your shop..."
+                  value={desc}
+                  onChangeText={setDesc}
+                  multiline
+                />
+
+                <View style={{ height: 20 }} />
+              </ScrollView>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={closeModal}>
+                  <Text style={{ color: "#666" }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.saveBtn}
+                  onPress={handleSave}
+                  disabled={loading}
+                >
+                  <Text style={{ color: "white", fontWeight: "bold" }}>
+                    {loading ? "Saving..." : "Save"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* District Selection Modal */}
+        <Modal
+          visible={showDistrictPicker}
+          transparent={true}
+          animationType="fade"
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxHeight: "60%" }]}>
+              <Text style={styles.modalTitle}>Select District</Text>
+              <ScrollView>
+                {availableDistricts.map((item) => (
+                  <TouchableOpacity
+                    key={item}
+                    style={styles.pickerItem}
+                    onPress={() => {
+                      setDistrict(item);
+                      setShowDistrictPicker(false);
+                    }}
+                  >
+                    <Text style={styles.pickerText}>{item}</Text>
+                    {district === item && (
+                      <Ionicons name="checkmark" size={20} color="#6200ea" />
+                    )}
                   </TouchableOpacity>
                 ))}
-              </View>
-
-              <Text style={styles.label}>Street Address *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. 123 Orchard Road"
-                value={address}
-                onChangeText={setAddress}
-              />
-
-              {/* District Dropdown */}
-              <Text style={styles.label}>District</Text>
+              </ScrollView>
               <TouchableOpacity
-                style={[styles.input, { justifyContent: "center" }]}
-                onPress={() => setShowDistrictPicker(true)}
+                style={styles.cancelBtn}
+                onPress={() => setShowDistrictPicker(false)}
               >
-                <Text style={{ color: district ? "#000" : "#999" }}>
-                  {district || "Select District"}
-                </Text>
-                <Ionicons
-                  name="chevron-down"
-                  size={20}
-                  color="#999"
-                  style={{ position: "absolute", right: 10 }}
-                />
-              </TouchableOpacity>
-
-              <Text style={styles.label}>Region</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. Central"
-                value={region}
-                onChangeText={setRegion}
-              />
-
-              {/* Price Range */}
-              <Text style={styles.label}>Price Range ($)</Text>
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
-              >
-                <View style={{ flex: 1 }}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Min (e.g. 10)"
-                    keyboardType="numeric"
-                    value={priceMin}
-                    onChangeText={setPriceMin}
-                  />
-                </View>
-                <Text>-</Text>
-                <View style={{ flex: 1 }}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Max (e.g. 50)"
-                    keyboardType="numeric"
-                    value={priceMax}
-                    onChangeText={setPriceMax}
-                  />
-                </View>
-              </View>
-
-              <Text style={styles.label}>Image URL</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="https://..."
-                value={imageUrl}
-                onChangeText={setImageUrl}
-                autoCapitalize="none"
-              />
-
-              <Text style={styles.label}>Description / Characteristic *</Text>
-              <TextInput
-                style={[styles.input, { height: 80, textAlignVertical: "top" }]}
-                placeholder="Describe your shop..."
-                value={desc}
-                onChangeText={setDesc}
-                multiline
-              />
-
-              <View style={{ height: 20 }} />
-            </ScrollView>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={closeModal}>
-                <Text style={{ color: "#666" }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.saveBtn}
-                onPress={handleSave}
-                disabled={loading}
-              >
-                <Text style={{ color: "white", fontWeight: "bold" }}>
-                  {loading ? "Saving..." : "Save"}
+                <Text
+                  style={{ color: "red", textAlign: "center", marginTop: 10 }}
+                >
+                  Close
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
-        </View>
-      </Modal>
-
-      {/* District Selection Modal */}
-      <Modal
-        visible={showDistrictPicker}
-        transparent={true}
-        animationType="fade"
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: "60%" }]}>
-            <Text style={styles.modalTitle}>Select District</Text>
-            <ScrollView>
-              {availableDistricts.map((item) => (
-                <TouchableOpacity
-                  key={item}
-                  style={styles.pickerItem}
-                  onPress={() => {
-                    setDistrict(item);
-                    setShowDistrictPicker(false);
-                  }}
-                >
-                  <Text style={styles.pickerText}>{item}</Text>
-                  {district === item && (
-                    <Ionicons name="checkmark" size={20} color="#6200ea" />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <TouchableOpacity
-              style={styles.cancelBtn}
-              onPress={() => setShowDistrictPicker(false)}
-            >
-              <Text
-                style={{ color: "red", textAlign: "center", marginTop: 10 }}
-              >
-                Close
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    </View>
+        </Modal>
+      </View>
+    </SafeAreaContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f8f9fa" },
+  container: { flex: 1 },
   header: {
     backgroundColor: "white",
-    paddingTop: 50,
+    paddingTop: 30,
     paddingBottom: 15,
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",

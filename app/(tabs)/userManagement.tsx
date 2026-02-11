@@ -1,15 +1,17 @@
 // app/(admin)/users.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
+
+import { SafeAreaContainer } from "@/constant/GlobalStyles";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { supabase } from "../../services/supabase";
 
@@ -65,73 +67,75 @@ export default function UserManagement() {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.searchBox}>
-        <TextInput
-          style={styles.input}
-          placeholder="Search user by email..."
-          value={query}
-          onChangeText={setQuery}
-          autoCapitalize="none"
-        />
-        <TouchableOpacity style={styles.searchBtn} onPress={searchUsers}>
-          <Ionicons name="search" size={20} color="white" />
-        </TouchableOpacity>
-      </View>
+    <SafeAreaContainer>
+      <View style={styles.container}>
+        <View style={styles.searchBox}>
+          <TextInput
+            style={styles.input}
+            placeholder="Search user by email..."
+            value={query}
+            onChangeText={setQuery}
+            autoCapitalize="none"
+          />
+          <TouchableOpacity style={styles.searchBtn} onPress={searchUsers}>
+            <Ionicons name="search" size={20} color="white" />
+          </TouchableOpacity>
+        </View>
 
-      {loading ? (
-        <ActivityIndicator style={{ marginTop: 20 }} />
-      ) : (
-        <FlatList
-          data={users}
-          // 🔥 Fix 4: Use 'auth_id' for the key extractor
-          keyExtractor={(item) => item.auth_id}
-          ListEmptyComponent={
-            <Text style={{ textAlign: "center", marginTop: 20, color: "#999" }}>
-              No users found
-            </Text>
-          }
-          renderItem={({ item }) => (
-            <View style={styles.userCard}>
-              <View>
-                <Text style={styles.email}>{item.email}</Text>
-                <Text style={styles.role}>Role: {item.role}</Text>
-                <Text
+        {loading ? (
+          <ActivityIndicator style={{ marginTop: 20 }} />
+        ) : (
+          <FlatList
+            data={users}
+            // 🔥 Fix 4: Use 'auth_id' for the key extractor
+            keyExtractor={(item) => item.auth_id}
+            ListEmptyComponent={
+              <Text style={{ textAlign: "center", marginTop: 20, color: "#999" }}>
+                No users found
+              </Text>
+            }
+            renderItem={({ item }) => (
+              <View style={styles.userCard}>
+                <View>
+                  <Text style={styles.email}>{item.email}</Text>
+                  <Text style={styles.role}>Role: {item.role}</Text>
+                  <Text
+                    style={[
+                      styles.status,
+                      { color: item.is_active ? "green" : "red" },
+                    ]}
+                  >
+                    {item.is_active ? "● Active" : "● Suspended"}
+                  </Text>
+                </View>
+                <TouchableOpacity
                   style={[
-                    styles.status,
-                    { color: item.is_active ? "green" : "red" },
+                    styles.actionBtn,
+                    { backgroundColor: item.is_active ? "#c0392b" : "#27ae60" },
                   ]}
+                  // 🔥 Fix 5: Pass item.auth_id to the function
+                  onPress={() => toggleStatus(item.auth_id, item.is_active)}
                 >
-                  {item.is_active ? "● Active" : "● Suspended"}
-                </Text>
+                  <Text style={{ color: "white", fontWeight: "bold" }}>
+                    {item.is_active ? "Suspend" : "Activate"}
+                  </Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                style={[
-                  styles.actionBtn,
-                  { backgroundColor: item.is_active ? "#c0392b" : "#27ae60" },
-                ]}
-                // 🔥 Fix 5: Pass item.auth_id to the function
-                onPress={() => toggleStatus(item.auth_id, item.is_active)}
-              >
-                <Text style={{ color: "white", fontWeight: "bold" }}>
-                  {item.is_active ? "Suspend" : "Activate"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        />
-      )}
-    </View>
+            )}
+          />
+        )}
+      </View>
+    </SafeAreaContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#f8f9fa" },
+  container: { flex: 1, padding: 20},
   searchBox: { flexDirection: "row", gap: 10, marginBottom: 20 },
   input: {
     flex: 1,
     backgroundColor: "white",
-    padding: 10,
+    padding: 12,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#ddd",

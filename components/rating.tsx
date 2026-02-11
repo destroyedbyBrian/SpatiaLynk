@@ -1,4 +1,3 @@
-import { ActionButton, ActionButtonText, ActionsRow } from '@/app/(tabs)/home';
 import { supabase } from "@/services/supabase";
 import { useUserAuthStore } from '@/store/userAuthStore';
 import { MaterialDesignIcons } from '@react-native-vector-icons/material-design-icons';
@@ -6,11 +5,13 @@ import { useState } from 'react';
 import {
 	Alert,
 	Modal,
+	Pressable,
 	StyleSheet,
 	Text,
 	TouchableOpacity,
-	View,
+	View
 } from 'react-native';
+import { styled } from "styled-components";
 
 
 const RecommendationCard = ({ poiId }: {poiId: string}) => {
@@ -59,7 +60,7 @@ const RecommendationCard = ({ poiId }: {poiId: string}) => {
 			.from("user_interactions")
 			.upsert(payload, { 
 				onConflict: 'user_id,poi_id,interaction_type',
-			});
+		});
 		
 		if (error) {
 			console.error('Supabase error:', error);
@@ -228,3 +229,27 @@ const styles = StyleSheet.create({
 });
 
 export default RecommendationCard;
+
+const ActionsRow = styled(View)`
+  flex-direction: row;
+  padding-top: 8px;
+`
+
+const ActionButton = styled(Pressable)`
+  flex: 1;
+  flex-direction: row;
+  justify-content: center;
+  background-color: #F5F5F5;
+  padding: 14px;
+  border-radius: 8px;
+  align-items: center;
+  border-width: 1px;
+  border-color: #E0E0E0;
+  gap: 4px;
+`;
+
+const ActionButtonText = styled(Text)`
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+`;

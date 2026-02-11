@@ -1,4 +1,3 @@
-// const API_BASE_URL = 'https://destroyedbyBrian-spatialynk.hf.space';
 const API_BASE_URL = 'https://destroyedbybrian-spatialynk-2-0.hf.space';
 
 export interface Location {
@@ -21,12 +20,15 @@ export interface POIInfo {
     price?: string;
     popularity?: number | string;
     region?: string;
-    num_pois?: number;
-    num_venues?: number;
-    num_districts?: number;
     textual?: string;
     latitude?: number;
     longitude?: number;
+    district?: string;
+    num_pois?: number;
+    description?: string;
+    num_venues?: number;
+    num_districts?: number;
+    address?: string;
   };
 }
 export interface Explanation {
@@ -100,6 +102,12 @@ export const getRecommendations = async (request: RecommendationRequest) => {
       level_1_count: data.recommendations?.level_1?.length,
       level_2_count: data.recommendations?.level_2?.length,
     });
+
+    if (data) {
+      console.log('Level 0:', JSON.stringify(data.recommendations.level_0, null, 2));
+      console.log('Level 1:', JSON.stringify(data.recommendations.level_1, null, 2));
+      console.log('Level 2:', JSON.stringify(data.recommendations.level_2, null, 2));
+    }
 
     return data;
   } catch (err) {
