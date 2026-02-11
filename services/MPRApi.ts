@@ -44,13 +44,11 @@ export interface RecommendationResponse {
     level_0: POIInfo[];
     level_1: POIInfo[];
     level_2: POIInfo[];
-    level_3: POIInfo[];
   };
   explanations: {
     level_0: Explanation[];
     level_1: Explanation[];
     level_2: Explanation[];
-    level_3: Explanation[];
   };
 }
 
@@ -101,7 +99,6 @@ export const getRecommendations = async (request: RecommendationRequest) => {
       level_0_count: data.recommendations?.level_0?.length,
       level_1_count: data.recommendations?.level_1?.length,
       level_2_count: data.recommendations?.level_2?.length,
-      level_3_count: data.recommendations?.level_3?.length,
     });
 
     return data;

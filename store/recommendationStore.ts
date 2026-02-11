@@ -17,12 +17,10 @@ interface RecommendationState {
   level0: POIInfo[];
   level1: POIInfo[];
   level2: POIInfo[];
-  level3: POIInfo[];
   
   explanations0: Explanation[];
   explanations1: Explanation[];
   explanations2: Explanation[];
-  explanations3: Explanation[];
   
   selectedLevel: number;
   selectedPOI: POIInfo | null;
@@ -52,11 +50,9 @@ export const useRecommendationStore = create<RecommendationState>((set, get) => 
   level0: [],
   level1: [],
   level2: [],
-  level3: [],
   explanations0: [],
   explanations1: [],
   explanations2: [],
-  explanations3: [],
   selectedLevel: 0,
   selectedPOI: null,
 
@@ -66,11 +62,9 @@ export const useRecommendationStore = create<RecommendationState>((set, get) => 
       level0: data.recommendations.level_0 || [],
       level1: data.recommendations.level_1 || [],
       level2: data.recommendations.level_2 || [],
-      level3: data.recommendations.level_3 || [],
       explanations0: data.explanations.level_0 || [],
       explanations1: data.explanations.level_1 || [],
       explanations2: data.explanations.level_2 || [],
-      explanations3: data.explanations.level_3 || [],
       currentPrompt: data.prompt,
       error: null,
     });
@@ -93,11 +87,9 @@ export const useRecommendationStore = create<RecommendationState>((set, get) => 
     level0: [],
     level1: [],
     level2: [],
-    level3: [],
     explanations0: [],
     explanations1: [],
     explanations2: [],
-    explanations3: [],
     selectedPOI: null,
     currentPrompt: '',
     error: null,
@@ -111,7 +103,6 @@ export const useRecommendationStore = create<RecommendationState>((set, get) => 
       case 0: return state.level0;
       case 1: return state.level1;
       case 2: return state.level2;
-      case 3: return state.level3;
       default: return [];
     }
   },
@@ -122,7 +113,6 @@ export const useRecommendationStore = create<RecommendationState>((set, get) => 
       case 0: return state.explanations0;
       case 1: return state.explanations1;
       case 2: return state.explanations2;
-      case 3: return state.explanations3;
       default: return [];
     }
   },
@@ -132,8 +122,7 @@ export const useRecommendationStore = create<RecommendationState>((set, get) => 
     return (
       state.level0.length +
       state.level1.length +
-      state.level2.length +
-      state.level3.length
+      state.level2.length
     );
   },
 

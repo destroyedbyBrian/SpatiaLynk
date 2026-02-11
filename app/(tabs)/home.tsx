@@ -1,4 +1,7 @@
+import RecommendationCard from "@/components/rating";
 import { SafeAreaContainer } from "@/constant/GlobalStyles";
+import { useUserAuthStore } from "@/store/userAuthStore";
+import { MaterialIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useRouter } from "expo-router";
 import { ArrowUp } from "lucide-react-native";
@@ -22,7 +25,6 @@ import {
 } from '../../services/MPRApi';
 import { useRecommendationStore } from '../../store/recommendationStore';
 
-const userId = "966592ed-5bfd-4113-9c4d-d93cd3637b40";
 
 export default function Index() {
   const router = useRouter();
@@ -35,6 +37,9 @@ export default function Index() {
   const { userLocation, setUserLocation } = useRecommendationStore();
   const [showKeyboard, setShowKeyboard] = useState<boolean>(false);
   const [expandedPOI, setExpandedPOI] = useState<string | null>(null);
+
+  const { user } = useUserAuthStore()
+  const userId = user?.id
   
   const suggestedPrompts = [
     "Things to do Near Me",
@@ -49,9 +54,11 @@ export default function Index() {
         console.error('Permission to access location was denied');
         return;
       }
-      // let location = await Location.getCurrentPositionAsync({});
-      let location = {"latitude": 1.2896, "longitude": 103.8168}
-      setUserLocation(location);
+      let location = await Location.getCurrentPositionAsync({});
+      setUserLocation({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
     }
 
     getCurrentLocation();
@@ -74,7 +81,7 @@ export default function Index() {
     
     try {
       const response: RecommendationResponse = await getRecommendations({
-        userId,
+        userId: userId?? 'unregistered',
         prompt: prompt.trim(),
         currentLocation: userLocation ? {
           latitude: userLocation.latitude,
@@ -116,6 +123,7 @@ export default function Index() {
     setExpandedPOI(expandedPOI === poiId ? null : poiId);
   };
 
+
   return (
     <TouchableWithoutFeedback onPress={handleOutsidePress}>
       <SafeAreaContainer>
@@ -129,7 +137,10 @@ export default function Index() {
             <ResultsHeader>
               <ResultsTitle>Found {rs.recommendations.level_0.length} places</ResultsTitle>
               <ViewMapButton onPress={() => router.navigate('/map')}>
-                <ViewMapButtonText>View on Map 🗺️</ViewMapButtonText>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <ViewMapButtonText>View on Map</ViewMapButtonText>
+                  <MaterialIcons name="map" size={20} color="white" />
+                </View>
               </ViewMapButton>
             </ResultsHeader>
 
@@ -154,7 +165,10 @@ export default function Index() {
                       {poi.details.region && (
                         <POIRegion>📍 {poi.details.region}</POIRegion>
                       )}
-                      <POIScore>⭐ Score: {poi.score.toFixed(2)}</POIScore>
+                      <View style={{ flexDirection: "row", alignItems: 'center', gap: '4' }}>
+                        <MaterialIcons name="star" size={20} color="red" />
+                        <POIScore>Score: {poi.score.toFixed(2)}</POIScore>
+                      </View>
                     </POIDetailsRow>
                   </POIMainInfo>
 
@@ -190,13 +204,16 @@ export default function Index() {
                   )}
 
                   {/* Quick Actions */}
-                  <ActionsRow>
+                  <ActionsContainer>
                     <ActionButton onPress={() => {
                       // Navigate to map and highlight this POI
                       useRecommendationStore.getState().setSelectedPOI(poi);
                       router.navigate('/map');
                     }}>
-                      <ActionButtonText>📍 Show on Map</ActionButtonText>
+                      <MaterialIcons name="location-pin" size={20} color="red" />
+                      <ActionButtonText>
+                        Show on Map
+                      </ActionButtonText>
                     </ActionButton>
 
                     <ActionButton onPress={() => {
@@ -206,9 +223,13 @@ export default function Index() {
                         [{ text: 'OK' }]
                       );
                     }}>
-                      <ActionButtonText>ℹ️ Details</ActionButtonText>
+                      <MaterialIcons name="info" size={20} color="gray" />
+                      <ActionButtonText>Explain POI</ActionButtonText>
                     </ActionButton>
-                  </ActionsRow>
+                  </ActionsContainer>
+                  
+                  <RecommendationCard poiId={poi.poi_id} />
+                  
                 </POICard>
               );
             })}
@@ -336,7 +357,7 @@ const POICategory = styled(Text)`
 
 const POIPrice = styled(Text)`
   font-size: 14px;
-  color: #32CD32;
+  color: black;
   font-weight: 600;
 `;
 
@@ -347,7 +368,7 @@ const POIRegion = styled(Text)`
 
 const POIScore = styled(Text)`
   font-size: 12px;
-  color: #FF8C00;
+  color: black;
   font-weight: 600;
 `;
 
@@ -409,23 +430,31 @@ const FactorText = styled(Text)`
   flex: 1;
 `;
 
-const ActionsRow = styled(View)`
+const ActionsContainer = styled(View)`
   flex-direction: row;
   gap: 8px;
 `;
 
-const ActionButton = styled(Pressable)`
+export const ActionsRow = styled(View)`
+  flex-direction: row;
+  padding-top: 8px;
+`
+
+export const ActionButton = styled(Pressable)`
   flex: 1;
+  flex-direction: row;
+  justify-content: center;
   background-color: #F5F5F5;
-  padding: 10px;
+  padding: 14px;
   border-radius: 8px;
   align-items: center;
   border-width: 1px;
   border-color: #E0E0E0;
+  gap: 4px;
 `;
 
-const ActionButtonText = styled(Text)`
-  font-size: 13px;
+export const ActionButtonText = styled(Text)`
+  font-size: 14px;
   font-weight: 600;
   color: #333;
 `;

@@ -6,29 +6,27 @@
 // // onPOIPress
 
 import { AppleMaps } from 'expo-maps';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRecommendationStore } from '../../store/recommendationStore';
 
-type MapLevel = 0 | 1 | 2 | 3;
+type MapLevel = 0 | 1 | 2;
 
 const Map = () => {
   const { 
     level0, 
     level1, 
     level2, 
-    level3, 
     userLocation, 
-    selectedPOI, 
     setSelectedPOI,
-    selectedLevel,
     setSelectedLevel,
   } = useRecommendationStore();
   
   const [currentLevel, setCurrentLevel] = useState<MapLevel>(0);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [selectedParent, setSelectedParent] = useState<string | null>(null);
   const mapRef = useRef<AppleMaps.MapView>(null);
+  const [isMapReady, setIsMapReady] = useState(false);
+
 
   // Get POIs for current level
   const getCurrentLevelData = () => {
@@ -36,7 +34,6 @@ const Map = () => {
       case 0: return level0;
       case 1: return level1;
       case 2: return level2;
-      case 3: return level3;
       default: return [];
     }
   };
@@ -62,14 +59,17 @@ const Map = () => {
 
   const [cameraPosition, setCameraPosition] = useState(getInitialCameraPosition());
 
-  // Update camera when level changes or recommendations load
   useEffect(() => {
-    const data = getCurrentLevelData();
-    if (data.length > 0) {
+    if (!isMapReady || currentLevelData.length === 0) return;
+    
+    // Small delay to ensure native view is fully initialized
+    const timer = setTimeout(() => {
       setCurrentIndex(0);
       zoomToCurrentLevelPOI(0);
-    }
-  }, []);
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [isMapReady, currentLevelData, currentLevel]);
 
   // Zoom level based on map level
   const getZoomForLevel = (level: MapLevel): number => {
@@ -77,10 +77,31 @@ const Map = () => {
       case 0: return 16; // Individual POIs - zoomed in
       case 1: return 15; // Containers - slightly zoomed out
       case 2: return 13; // Districts - more zoomed out
-      case 3: return 11; // Regions - very zoomed out
       default: return 14;
     }
   };
+
+  const moveCameraToCoordinates = useCallback(async (latitude: number, longitude: number, zoom: number) => {
+    if (!mapRef.current) {
+      console.warn('Map ref not ready');
+      return;
+    }
+
+    try {
+      await mapRef.current.setCameraPosition({
+        coordinates: { latitude, longitude },
+        zoom,
+      });
+
+      setCameraPosition({
+        coordinates: { latitude, longitude },
+        zoom,
+      });
+    } catch (error) {
+      console.warn('Failed to update camera position:', error);
+    }
+  }, []);
+
 
   // Get all markers for current level
   const getMarkersForCurrentLevel = (): AppleMaps.Marker[] => {
@@ -117,8 +138,6 @@ const Map = () => {
         return `${poi.details.num_pois || 0} places`;
       case 2:
         return `${poi.details.num_venues || 0} venues`;
-      case 3:
-        return `${poi.details.num_districts || 0} districts`;
       default:
         return '';
     }
@@ -135,7 +154,6 @@ const Map = () => {
     const levelColors = {
       1: '#9370DB', // Purple for containers
       2: '#FF8C00', // Orange for districts
-      3: '#32CD32', // Green for regions
     };
     
     return levelColors[level] || '#0E6DE8';
@@ -150,7 +168,6 @@ const Map = () => {
     const levelIcons = {
       1: 'building.2.fill',        // Containers
       2: 'map.fill',                // Districts
-      3: 'globe.americas.fill',     // Regions
     };
     
     return levelIcons[level] || 'mappin.circle.fill';
@@ -196,19 +213,6 @@ const Map = () => {
     return 'mappin.circle.fill';
   };
 
-  // Move camera to coordinates
-  const moveCameraToCoordinates = (latitude: number, longitude: number, zoom: number) => {
-    mapRef.current?.setCameraPosition({
-      coordinates: { latitude, longitude },
-      zoom,
-    });
-
-    setCameraPosition({
-      coordinates: { latitude, longitude },
-      zoom,
-    });
-  };
-
   // Zoom to specific POI at current level
   const zoomToCurrentLevelPOI = (index: number) => {
     const data = getCurrentLevelData();
@@ -244,7 +248,6 @@ const Map = () => {
       0: 'Individual Places',
       1: 'Venues & Malls',
       2: 'Districts',
-      3: 'Regions',
     };
     return names[level];
   };
@@ -295,8 +298,8 @@ const Map = () => {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.levelSelector}
         >
-          {[0, 1, 2, 3].map((level) => {
-            const data = level === 0 ? level0 : level === 1 ? level1 : level === 2 ? level2 : level3;
+          {[0, 1, 2].map((level) => {
+            const data = level === 0 ? level0 : level === 1 ? level1 : level2;
             const isSelected = currentLevel === level;
             const count = data.length;
 
