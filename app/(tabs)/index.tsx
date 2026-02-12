@@ -22,11 +22,14 @@ import {
 } from "react-native";
 import { styled } from "styled-components";
 import {
+  addUser,
   checkAPIHealth,
   Explanation,
+  getExplanation,
   getRecommendations,
   POIInfo,
-  RecommendationResponse
+  RecommendationResponse,
+  recordInteraction
 } from '../../services/MPRApi';
 import { useRecommendationStore } from '../../store/recommendationStore';
 
@@ -54,10 +57,38 @@ export default function RecommendationTabs() {
   const [prompt, setPrompt] = useState<string>("");
   const [showKeyboard, setShowKeyboard] = useState<boolean>(false);
   const [expandedPOI, setExpandedPOI] = useState<string | null>(null);
+  // Track which POIs we've recorded interactions for to avoid duplicates
+  const [recordedInteractions, setRecordedInteractions] = useState<Set<string>>(new Set());
   
   const { user } = useUserAuthStore()
   const userId = user?.id
   const isHydrated = useUserAuthStore((s) => s.isHydrated);
+
+  // Workflow 1: Cold Start - Register user with recommendation system
+  useEffect(() => {
+    async function registerUserForRecommendations() {
+      if (!userId) return;
+      
+      try {
+        // Get user interests from metadata or preferences
+        const interests = user?.user_metadata?.interests || "general";
+        
+        await addUser({
+          user_id: userId,
+          interests: Array.isArray(interests) ? interests.join(";") : interests
+        });
+        
+        console.log('User registered with recommendation system:', userId);
+      } catch (error) {
+        console.error('Failed to register user for recommendations:', error);
+        // Non-fatal error, don't alert user
+      }
+    }
+
+    if (userId) {
+      registerUserForRecommendations();
+    }
+  }, [userId, user?.user_metadata?.interests]);
 
   useEffect(() => {
     async function getCurrentLocation() {
@@ -115,29 +146,28 @@ export default function RecommendationTabs() {
     setLoading(true);
 
     try {
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('user_id')
-        .eq("auth_id", userId)
-        .single();
-
-      if (userError || !userData?.user_id) {
-        console.error('Failed to fetch user_id:', userError);
-        Alert.alert('Error', 'Unable to verify account. Please try again.');
-        return; 
-      }
-
+      // Workflow 2: Get recommendations with explanations
       const response: RecommendationResponse = await getRecommendations({
-        userId: userData.user_id,
+        userId: userId!, // We know userId exists because of permission check
         prompt: prompt.trim(),
         currentLocation: userLocation ? {
           latitude: userLocation.latitude,
           longitude: userLocation.longitude,
         } : undefined,
+        includeExplanations: true  // Request explanations with recommendations
       });
 
       setRecommendations(response);
       setSelectedLevel(0); 
+
+      // Log explanation data for debugging (Workflow 3)
+      if (response.recommendations.level_0.length > 0) {
+        const firstPoi = response.recommendations.level_0[0];
+        if (firstPoi?.explanation) {
+          console.log('First POI explanation:', firstPoi.explanation.human_explanation);
+          console.log('Confidence:', firstPoi.explanation.confidence_indicator); // "strong", "good", or "potential"
+        }
+      }
 
       Alert.alert(
         'Success!', 
@@ -163,6 +193,44 @@ export default function RecommendationTabs() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Workflow 4: Record interaction when user engages with POI
+  const handleRecordInteraction = async (poi: POIInfo, interactionType: 'view' | 'visit' | 'click' | 'expand' = 'view', value: number = 1.0) => {
+    if (!userId || recordedInteractions.has(poi.poi_id)) return;
+    
+    try {
+      await recordInteraction({
+        user_id: userId,
+        poi_id: poi.poi_id,
+        interaction_type: interactionType,
+        value: value
+      });
+      
+      // Mark as recorded to avoid duplicate calls
+      setRecordedInteractions(prev => new Set(prev).add(poi.poi_id));
+      console.log(`Recorded ${interactionType} interaction for ${poi.name}`);
+    } catch (error) {
+      console.error('Failed to record interaction:', error);
+    }
+  };
+
+  // Workflow 5: Get explanation on-demand if not included in initial request
+  const fetchExplanationOnDemand = async (poi: POIInfo, level: number): Promise<Explanation | null> => {
+    if (!userId) return null;
+    
+    try {
+      const explanation = await getExplanation({
+        user_id: userId,
+        poi_id: poi.poi_id,
+        level: level
+      });
+      
+      return explanation;
+    } catch (error) {
+      console.error('Failed to fetch explanation on-demand:', error);
+      return null;
     }
   };
 
@@ -194,12 +262,35 @@ export default function RecommendationTabs() {
     }
   };
 
-  const getExplanationForPOI = (poiId: string) => {
-    return getCurrentExplanations().find(exp => exp.poi_id === poiId);
+  // Updated to support both nested explanations (Workflow 3) and separate arrays
+  const getExplanationForPOI = (poi: POIInfo): Explanation | undefined => {
+    // First check if explanation is nested in POI (from Workflow 2 with includeExplanations)
+    if (poi.explanation) {
+      return poi.explanation;
+    }
+    // Fall back to separate explanation arrays
+    return getCurrentExplanations().find(exp => exp.poi_id === poi.poi_id);
   };
 
-  const toggleExpanded = (poiId: string) => {
-    setExpandedPOI(expandedPOI === poiId ? null : poiId);
+  const toggleExpanded = async (poi: POIInfo) => {
+    const poiId = poi.poi_id;
+    const isExpanded = expandedPOI === poiId;
+    
+    if (!isExpanded) {
+      // Workflow 4: Record expand interaction
+      await handleRecordInteraction(poi, 'expand', 0.5);
+      
+      // Workflow 5: If no explanation available, try to fetch on-demand
+      if (!getExplanationForPOI(poi)) {
+        const explanation = await fetchExplanationOnDemand(poi, selectedLevel);
+        if (explanation) {
+          // Store it temporarily or update state as needed
+          console.log('Fetched explanation on-demand:', explanation);
+        }
+      }
+    }
+    
+    setExpandedPOI(isExpanded ? null : poiId);
   };
 
   const renderLevelTabs = () => (
@@ -228,44 +319,56 @@ export default function RecommendationTabs() {
     </LevelSelector>
   );
 
-  const renderDistrictCard = (item: POIInfo) => (
-    <DistrictCard key={item.poi_id}>
-      <DistrictHeader>
-        <View style={{ flex: 1 }}>
-          <DistrictName>🏙️ {item.name}</DistrictName>
-          {item.details?.description && (
-            <DistrictDescription>{item.details.description}</DistrictDescription>
-          )}
-        </View>
-        <DistrictBadge>
-          <MaterialIcons name="star" size={14} color="white" />
-          <DistrictScore>{item.score.toFixed(2)}</DistrictScore>
-        </DistrictBadge>
-      </DistrictHeader>
-      
-      <DistrictMeta>
-        <MetaItem>
-          <MaterialIcons name="location-city" size={16} color="rgba(255,255,255,0.8)" />
-          <MetaText>Regional District</MetaText>
-        </MetaItem>
-        <MetaItem>
-          <MaterialIcons name="analytics" size={16} color="rgba(255,255,255,0.8)" />
-          <MetaText>Score: {(item.score * 100).toFixed(0)}% match</MetaText>
-        </MetaItem>
-      </DistrictMeta>
+  const renderDistrictCard = (item: POIInfo) => {
+    const explanation = getExplanationForPOI(item);
+    
+    return (
+      <DistrictCard key={item.poi_id}>
+        <DistrictHeader>
+          <View style={{ flex: 1 }}>
+            <DistrictName>🏙️ {item.name}</DistrictName>
+            {item.details?.description && (
+              <DistrictDescription>{item.details.description}</DistrictDescription>
+            )}
+            {/* Workflow 3: Show confidence indicator if available */}
+            {explanation?.confidence_indicator && (
+              <ConfidenceBadge indicator={explanation.confidence_indicator}>
+                <ConfidenceText>{explanation.confidence_indicator.toUpperCase()} MATCH</ConfidenceText>
+              </ConfidenceBadge>
+            )}
+          </View>
+          <DistrictBadge>
+            <MaterialIcons name="star" size={14} color="white" />
+            <DistrictScore>{item.score.toFixed(2)}</DistrictScore>
+          </DistrictBadge>
+        </DistrictHeader>
+        
+        <DistrictMeta>
+          <MetaItem>
+            <MaterialIcons name="location-city" size={16} color="rgba(255,255,255,0.8)" />
+            <MetaText>Regional District</MetaText>
+          </MetaItem>
+          <MetaItem>
+            <MaterialIcons name="analytics" size={16} color="rgba(255,255,255,0.8)" />
+            <MetaText>Score: {(item.score * 100).toFixed(0)}% match</MetaText>
+          </MetaItem>
+        </DistrictMeta>
 
-      <ExploreButton onPress={() => {
-        setSelectedPOI(item);
-        router.navigate('/map');
-      }}>
-        <ExploreButtonText>Explore District</ExploreButtonText>
-        <MaterialIcons name="arrow-forward" size={18} color="#0E6DE8" />
-      </ExploreButton>
-    </DistrictCard>
-  );
+        <ExploreButton onPress={async () => {
+          // Workflow 4: Record visit interaction
+          await handleRecordInteraction(item, 'visit', 1.0);
+          setSelectedPOI(item);
+          router.navigate('/map');
+        }}>
+          <ExploreButtonText>Explore District</ExploreButtonText>
+          <MaterialIcons name="arrow-forward" size={18} color="#0E6DE8" />
+        </ExploreButton>
+      </DistrictCard>
+    );
+  };
 
   const renderStreetCard = (item: POIInfo) => {
-    const explanation = getExplanationForPOI(item.poi_id);
+    const explanation = getExplanationForPOI(item);
     const isExpanded = expandedPOI === item.poi_id;
 
     return (
@@ -285,10 +388,18 @@ export default function RecommendationTabs() {
 
         {explanation && (
           <>
-            <ExplanationToggle onPress={() => toggleExpanded(item.poi_id)}>
+            <ExplanationToggle onPress={() => toggleExpanded(item)}>
               <ExplanationToggleText>
                 {isExpanded ? '▼' : '▶'} Why this area?
               </ExplanationToggleText>
+              {/* Workflow 3: Show confidence indicator */}
+              {explanation.confidence_indicator && (
+                <ConfidenceChip indicator={explanation.confidence_indicator}>
+                  <Text style={{ fontSize: 10, color: 'white', fontWeight: 'bold' }}>
+                    {explanation.confidence_indicator}
+                  </Text>
+                </ConfidenceChip>
+              )}
             </ExplanationToggle>
 
             {isExpanded && (
@@ -311,7 +422,8 @@ export default function RecommendationTabs() {
         )}
 
         <StreetActions>
-          <ActionButton onPress={() => {
+          <ActionButton onPress={async () => {
+            await handleRecordInteraction(item, 'view', 0.8);
             setSelectedPOI(item);
             router.navigate('/map');
           }}>
@@ -324,7 +436,7 @@ export default function RecommendationTabs() {
   };
 
   const renderPOICard = (item: POIInfo) => {
-    const explanation = getExplanationForPOI(item.poi_id);
+    const explanation = getExplanationForPOI(item);
     const isExpanded = expandedPOI === item.poi_id;
 
     return (
@@ -350,10 +462,17 @@ export default function RecommendationTabs() {
 
         {explanation && (
           <>
-            <ExplanationToggle onPress={() => toggleExpanded(item.poi_id)}>
+            <ExplanationToggle onPress={() => toggleExpanded(item)}>
               <ExplanationToggleText>
                 {isExpanded ? '▼' : '▶'} Why recommended?
               </ExplanationToggleText>
+              {explanation.confidence_indicator && (
+                <ConfidenceChip indicator={explanation.confidence_indicator}>
+                  <Text style={{ fontSize: 10, color: 'white', fontWeight: 'bold' }}>
+                    {explanation.confidence_indicator}
+                  </Text>
+                </ConfidenceChip>
+              )}
             </ExplanationToggle>
 
             {isExpanded && (
@@ -376,7 +495,9 @@ export default function RecommendationTabs() {
         )}
 
         <ActionsContainer>
-          <ActionButton onPress={() => {
+          <ActionButton onPress={async () => {
+            // Workflow 4: Record visit interaction
+            await handleRecordInteraction(item, 'visit', 1.0);
             setSelectedPOI(item);
             router.navigate('/map');
           }}>
@@ -384,7 +505,9 @@ export default function RecommendationTabs() {
             <ActionButtonText>Map</ActionButtonText>
           </ActionButton>
 
-          <ActionButton onPress={() => {
+          <ActionButton onPress={async () => {
+            // Workflow 4: Record click interaction
+            await handleRecordInteraction(item, 'click', 0.5);
             Alert.alert(
               item.name,
               explanation?.human_explanation || 'No explanation available',
@@ -426,7 +549,7 @@ export default function RecommendationTabs() {
             <ActivityIndicator size="large" color="#0E6DE8" />
             <Text style={{ marginTop: 12, color: '#666' }}>Getting recommendations...</Text>
           </LoadingContainer>
-        ) : rs && getCurrentLevelData().length > 0 ? (
+        ) : rs && rs.recommendations && getCurrentLevelData().length > 0 ? (
           <ResultsScrollView>
             <ResultsHeader>
               <ResultsTitle>Recommendations</ResultsTitle>
@@ -555,6 +678,34 @@ const ResultsSummary = styled(Text)`
   color: #666;
   text-align: center;
   margin-bottom: 8px;
+`;
+
+// Confidence indicator badges (Workflow 3)
+const ConfidenceBadge = styled(View)<{ indicator: string }>`
+  background-color: ${props => 
+    props.indicator === 'strong' ? '#4CAF50' : 
+    props.indicator === 'good' ? '#FFB800' : '#FF9800'};
+  padding-horizontal: 8px;
+  padding-vertical: 4px;
+  border-radius: 4px;
+  align-self: flex-start;
+  margin-top: 6px;
+`;
+
+const ConfidenceChip = styled(View)<{ indicator: string }>`
+  background-color: ${props => 
+    props.indicator === 'strong' ? '#4CAF50' : 
+    props.indicator === 'good' ? '#FFB800' : '#FF9800'};
+  padding-horizontal: 6px;
+  padding-vertical: 2px;
+  border-radius: 10px;
+  margin-left: auto;
+`;
+
+const ConfidenceText = styled(Text)`
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
 `;
 
 // Level 2: District Styles
@@ -761,6 +912,7 @@ const ExplanationToggleText = styled(Text)`
   font-size: 14px;
   font-weight: 600;
   color: #0E6DE8;
+  flex: 1;
 `;
 
 const ExplanationContainer = styled(View)`
@@ -905,4 +1057,3 @@ const SuggestedPromptsText = styled(Text)`
   font-weight: 600;
   padding: 14px;
 `;
-

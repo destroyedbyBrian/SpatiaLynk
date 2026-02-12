@@ -57,14 +57,16 @@ export const useRecommendationStore = create<RecommendationState>((set, get) => 
   selectedPOI: null,
 
   setRecommendations: (data) => {
+    console.log('Setting recommendations:', JSON.stringify(data, null, 2));
+
     set({
       recommendations: data,
-      level0: data.recommendations.level_0 || [],
-      level1: data.recommendations.level_1 || [],
-      level2: data.recommendations.level_2 || [],
-      explanations0: data.explanations.level_0 || [],
-      explanations1: data.explanations.level_1 || [],
-      explanations2: data.explanations.level_2 || [],
+      level0: data.recommendations?.level_0 || [],
+      level1: data.recommendations?.level_1 || [],
+      level2: data.recommendations?.level_2 || [],
+      explanations0: data.explanations?.level_0 || [],
+      explanations1: data.explanations?.level_1 || [],
+      explanations2: data.explanations?.level_2 || [],
       currentPrompt: data.prompt,
       error: null,
     });

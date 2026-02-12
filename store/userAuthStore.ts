@@ -15,6 +15,8 @@ type Action = {
   setIsHydrated: (value: boolean) => void; 
 };
 
+let authSubscription: ReturnType<typeof supabase.auth.onAuthStateChange> | null = null;
+
 export const useUserAuthStore = create<State & Action>()(
   persist(
     (set) => ({
@@ -28,21 +30,23 @@ export const useUserAuthStore = create<State & Action>()(
       name: "user-auth-storage",
       storage: createJSONStorage(() => secureStoreStorage),
       partialize: (state) => ({ user: state.user }),
-      onRehydrateStorage: () => (state) => {
-        state?.setIsHydrated(true);
+      onRehydrateStorage: () => async (state) => {
+        const { data: { session } } = await supabase.auth.getSession();
+        state?.setUser(session?.user ?? null);
+
+        authSubscription = supabase.auth.onAuthStateChange((event, session) => {
+          console.log(`Auth event: ${event}`, session?.user?.email);
+          state?.setUser(session?.user ?? null);
+          
+          if (event === 'INITIAL_SESSION') {
+            state?.setIsHydrated(true);
+          }
+        });
       },
     }
   )
 );
 
-supabase.auth.getUser().then(({ data: { user } }) => {
-    useUserAuthStore.getState().setUser(user);
-});
-
-const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-    useUserAuthStore.getState().setUser(session?.user ?? null);
-});
-
 export const unsubscribeAuth = () => {
-    authListener?.subscription.unsubscribe()
-}
+  authSubscription?.data?.subscription?.unsubscribe();
+};

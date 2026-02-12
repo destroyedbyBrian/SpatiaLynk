@@ -18,15 +18,15 @@ export default function TabLayout() {
     const userRole = user?.user_metadata?.role?.toLowerCase() as 'unregistered' | 'free_user' | 'business' | 'admin';
 
     const roleBasedTabs = {
-        unregistered: ['home', 'profile'],
-        free_user: ['home', 'map', 'history', 'profile'],
+        unregistered: ['index', 'profile'],
+        free_user: ['index', 'map', 'history', 'profile'],
         business: ['businessDashboard', 'analytics', 'approvals', 'profile'],
         admin: ['adminDashboard', 'userManagement', 'spots', 'profile'],
     } as const
 
     const tabConfig = {
-        home: {
-            title: 'Home',
+        index: {
+            title: 'home',
             headerShown: false,
             tabBarIcon: ({ color, size }: { color: string; size: number }) => (
                 <UserRoundSearch color={color} size={size} />
@@ -104,26 +104,12 @@ export default function TabLayout() {
     }
 
     return (
-        <Tabs>
+        <Tabs screenOptions={{ headerShown: false }}>
             <Tabs.Screen
-                name="home"
+                name="index"
                 options={{
-                    ...tabConfig.home,
-                    href: isTabVisible('home') ? '/home' : null,
-                }}
-            />
-            <Tabs.Screen
-                name="map"
-                options={{
-                    ...tabConfig.map,
-                    href: isTabVisible('map') ? '/map' : null,
-                }}
-            />
-            <Tabs.Screen
-                name="history"
-                options={{
-                    ...tabConfig.history,
-                    href: isTabVisible('history') ? '/history' : null,
+                    ...tabConfig.index,
+                    href: isTabVisible('index') ? '/' : null,
                 }}
             />
             <Tabs.Screen
@@ -134,20 +120,6 @@ export default function TabLayout() {
                 }}
             />
             <Tabs.Screen
-                name="analytics"
-                options={{
-                    ...tabConfig.analytics,
-                    href: isTabVisible('analytics') ? '/analytics' : null,
-                }}
-            />
-            <Tabs.Screen
-                name="approvals"
-                options={{
-                    ...tabConfig.approvals,
-                    href: isTabVisible('approvals') ? '/approvals' : null,
-                }}
-            />
-            <Tabs.Screen
                 name="adminDashboard"
                 options={{
                     ...tabConfig.adminDashboard,
@@ -155,10 +127,38 @@ export default function TabLayout() {
                 }}
             />
             <Tabs.Screen
+                name="map"
+                options={{
+                    ...tabConfig.map,
+                    href: isTabVisible('map') ? '/map' : null,
+                }}
+            />
+            <Tabs.Screen
+                name="analytics"
+                options={{
+                    ...tabConfig.analytics,
+                    href: isTabVisible('analytics') ? '/analytics' : null,
+                }}
+            />
+            <Tabs.Screen
                 name="userManagement"
                 options={{
                     ...tabConfig.userManagement,
                     href: isTabVisible('userManagement') ? '/userManagement' : null,
+                }}
+            />
+            <Tabs.Screen
+                name="history"
+                options={{
+                    ...tabConfig.history,
+                    href: isTabVisible('history') ? '/history' : null,
+                }}
+            />
+            <Tabs.Screen
+                name="approvals"
+                options={{
+                    ...tabConfig.approvals,
+                    href: isTabVisible('approvals') ? '/approvals' : null,
                 }}
             />
             <Tabs.Screen
