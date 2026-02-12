@@ -56,21 +56,21 @@ export const useRecommendationStore = create<RecommendationState>((set, get) => 
   selectedLevel: 0,
   selectedPOI: null,
 
-  setRecommendations: (data) => {
-    console.log('Setting recommendations:', JSON.stringify(data, null, 2));
-
-    set({
-      recommendations: data,
-      level0: data.recommendations?.level_0 || [],
-      level1: data.recommendations?.level_1 || [],
-      level2: data.recommendations?.level_2 || [],
-      explanations0: data.explanations?.level_0 || [],
-      explanations1: data.explanations?.level_1 || [],
-      explanations2: data.explanations?.level_2 || [],
-      currentPrompt: data.prompt,
-      error: null,
-    });
-  },
+  setRecommendations: (response) => set({
+    recommendations: response,
+    level0: response.recommendations.level_0,
+    level1: response.recommendations.level_1,
+    level2: response.recommendations.level_2,
+    explanations0: response.recommendations.level_0
+      .map(poi => poi.explanation)
+      .filter((exp): exp is Explanation => exp !== undefined),
+    explanations1: response.recommendations.level_1
+      .map(poi => poi.explanation)
+      .filter((exp): exp is Explanation => exp !== undefined),
+    explanations2: response.recommendations.level_2
+      .map(poi => poi.explanation)
+      .filter((exp): exp is Explanation => exp !== undefined),
+  }),
 
   setUserLocation: (location) => set({ userLocation: location }),
 

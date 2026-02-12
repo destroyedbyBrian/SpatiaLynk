@@ -437,7 +437,6 @@ export default function RecommendationTabs() {
 
   const renderPOICard = (item: POIInfo) => {
     const explanation = getExplanationForPOI(item);
-    const isExpanded = expandedPOI === item.poi_id;
 
     return (
       <POICard key={item.poi_id}>
@@ -460,40 +459,7 @@ export default function RecommendationTabs() {
           </POIDetailsRow>
         </POIMainInfo>
 
-        {explanation && (
-          <>
-            <ExplanationToggle onPress={() => toggleExpanded(item)}>
-              <ExplanationToggleText>
-                {isExpanded ? '▼' : '▶'} Why recommended?
-              </ExplanationToggleText>
-              {explanation.confidence_indicator && (
-                <ConfidenceChip indicator={explanation.confidence_indicator}>
-                  <Text style={{ fontSize: 10, color: 'white', fontWeight: 'bold' }}>
-                    {explanation.confidence_indicator}
-                  </Text>
-                </ConfidenceChip>
-              )}
-            </ExplanationToggle>
-
-            {isExpanded && (
-              <ExplanationContainer>
-                <ExplanationText>{explanation.human_explanation}</ExplanationText>
-                {explanation.top_factors && explanation.top_factors.length > 0 && (
-                  <FactorsContainer>
-                    <FactorsTitle>Key Factors:</FactorsTitle>
-                    {explanation.top_factors.map((factor, index) => (
-                      <FactorItem key={index}>
-                        <FactorBullet>•</FactorBullet>
-                        <FactorText>{factor}</FactorText>
-                      </FactorItem>
-                    ))}
-                  </FactorsContainer>
-                )}
-              </ExplanationContainer>
-            )}
-          </>
-        )}
-
+ 
         <ActionsContainer>
           <ActionButton onPress={async () => {
             // Workflow 4: Record visit interaction
@@ -514,8 +480,7 @@ export default function RecommendationTabs() {
               [{ text: 'OK' }]
             );
           }}>
-            <MaterialIcons name="info-outline" size={20} color="#666" />
-            <ActionButtonText>Details</ActionButtonText>
+            <ActionButtonText>View Explanation</ActionButtonText>
           </ActionButton>
         </ActionsContainer>
 

@@ -141,15 +141,23 @@ export interface RecommendationResponse {
   success?: boolean;
   userId?: string;
   prompt: string;
+  mode?: string;
   recommendations: {
     level_0: POIInfo[];
     level_1: POIInfo[];
     level_2: POIInfo[];
   };
-  explanations?: {  // Make optional
+  // Make optional or remove entirely:
+  explanations?: {  
     level_0: Explanation[];
     level_1: Explanation[];
     level_2: Explanation[];
+  };
+  summary?: {
+    total_recommendations: number;
+    explanation_stats?: any;
+    prompt_type?: string;
+    detected_intent?: string | null;
   };
 }
 
