@@ -17,6 +17,8 @@ export interface RecommendationRequest {
 export interface UserProfileRequest {
   user_id: string;
   interests: string; // Semicolon-separated, e.g., "food;coffee;shopping"
+  budget?: 'low' | 'medium' | 'high'; 
+  transport_modes?: string;           
 }
 
 export interface InteractionPayload {
@@ -242,6 +244,7 @@ export const recordInteraction = async (payload: InteractionPayload): Promise<{o
 export const getRecommendations = async (
   request: RecommendationRequest
 ): Promise<RecommendationResponse> => {
+  console.log(request.userId)
   const response = await fetch(`${API_BASE_URL}/recommend`, {
     method: 'POST',
     headers: {

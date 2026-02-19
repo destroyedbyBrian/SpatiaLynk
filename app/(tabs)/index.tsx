@@ -70,25 +70,42 @@ export default function RecommendationTabs() {
       if (!userId) return;
       
       try {
-        // Get user interests from metadata or preferences
-        const interests = user?.user_metadata?.interests || "general";
-        
+        const { data: userProfile, error } = await supabase
+          .from('users')
+          .select('user_id, interests, price_sensitivity, transportation_modes, auth_id')
+          .eq('auth_id', userId) 
+          .single();
+
+        if (!userProfile || !userProfile.interests) {
+          console.error('Failed to fetch user profile:', error);
+          return;
+        }
+
+        console.log('Found profile:', userProfile);
+
         await addUser({
-          user_id: userId,
-          interests: Array.isArray(interests) ? interests.join(";") : interests
+          user_id: userProfile.user_id,  
+          interests: userProfile.interests || "general",
+          budget: userProfile.price_sensitivity || "medium",
+          transport_modes: userProfile.transportation_modes || "bus"
         });
         
-        console.log('User registered with recommendation system:', userId);
+        console.log('User registered with MPR system:', {
+          id: userProfile.user_id,
+          interests: userProfile.interests,
+          budget: userProfile.price_sensitivity,
+          transport: userProfile.transportation_modes
+        });
+        
       } catch (error) {
         console.error('Failed to register user for recommendations:', error);
-        // Non-fatal error, don't alert user
       }
     }
 
     if (userId) {
       registerUserForRecommendations();
     }
-  }, [userId, user?.user_metadata?.interests]);
+  }, [userId]);
 
   useEffect(() => {
     async function getCurrentLocation() {
@@ -146,17 +163,28 @@ export default function RecommendationTabs() {
     setLoading(true);
 
     try {
-      // Workflow 2: Get recommendations with explanations
+      const { data: userProfile, error: profileError } = await supabase
+        .from('users')
+        .select('user_id')
+        .eq('auth_id', userId) 
+        .single();
+      
+      if (profileError || !userProfile) {
+        throw new Error('User profile not found in database');
+      }
+
+      const mprUserId = userProfile.user_id; 
+      console.log('Using MPR User ID:', mprUserId);
+
       const response: RecommendationResponse = await getRecommendations({
-        userId: userId!, // We know userId exists because of permission check
+        userId: mprUserId, 
         prompt: prompt.trim(),
         currentLocation: userLocation ? {
           latitude: userLocation.latitude,
           longitude: userLocation.longitude,
         } : undefined,
-        includeExplanations: true  // Request explanations with recommendations
+        includeExplanations: true
       });
-
       setRecommendations(response);
       setSelectedLevel(0); 
 
@@ -306,14 +334,14 @@ export default function RecommendationTabs() {
         active={selectedLevel === 1} 
         onPress={() => setSelectedLevel(1)}
       >
-        <LevelTabText active={selectedLevel === 1}>Areas</LevelTabText>
+        <LevelTabText active={selectedLevel === 1}>Container</LevelTabText>
         <LevelCount active={selectedLevel === 1}>{level1.length}</LevelCount>
       </LevelTab>
       <LevelTab 
         active={selectedLevel === 2} 
         onPress={() => setSelectedLevel(2)}
       >
-        <LevelTabText active={selectedLevel === 2}>Districts</LevelTabText>
+        <LevelTabText active={selectedLevel === 2}>Streets</LevelTabText>
         <LevelCount active={selectedLevel === 2}>{level2.length}</LevelCount>
       </LevelTab>
     </LevelSelector>
@@ -559,6 +587,7 @@ export default function RecommendationTabs() {
             placeholderTextColor={"#878787"}
             multiline={true}
             onFocus={() => setShowKeyboard(true)}
+            onBlur={() => setShowKeyboard(false)}
           />
           {prompt && (
             <IconContainer 
